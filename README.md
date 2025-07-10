@@ -1,6 +1,3 @@
-#
-
-
 # Tools
 - Linux or WSL
 - Make
@@ -12,15 +9,13 @@ apt install make nasm qemu-system qemu-utils
 
 x86
 
-# Progress
-
-# Provar que funcioni
+# Testing
 
 └─$ make
 
 └─$ qemu-system-i386 -fda build/main_floppy.img
 
-# Git Tools
+# Git Tools (im a noob)
 
 git commit -m ""
 
