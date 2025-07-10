@@ -1,7 +1,7 @@
 # Introduction
 This is an x86 OS built from scratch
 
-# Tools
+# Prerequisites
 - Linux or WSL
 - Make
 - NASM (as assembler)
