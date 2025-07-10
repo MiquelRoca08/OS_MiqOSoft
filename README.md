@@ -25,3 +25,8 @@ x86
 
 ┌──(kali㉿LAPTOP-E7BS86DA)-[/mnt/c/Users/ASUS/OS]
 └─$ qemu-system-i386 -fda build/main_floppy.img
+
+# Git Tools
+
+git commit -m ""
+git push -u origin master
