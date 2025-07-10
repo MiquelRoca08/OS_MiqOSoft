@@ -29,4 +29,4 @@ x86
 # Git Tools
 
 git commit -m ""
-git push -u origin master
+git push -u origin main
