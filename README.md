@@ -5,7 +5,7 @@ This is an x86 OS built from scratch
 - Linux or WSL
 - Make
 - NASM (as assembler)
-- quemu (as virtualization software)
+- QEMU (as virtualization software)
 ```
 apt install make nasm qemu-system qemu-utils
 ```
