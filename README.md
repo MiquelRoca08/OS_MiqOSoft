@@ -12,12 +12,11 @@ x86
 # Testing
 ```
   make
-
-  qemu-system-i386 -fda build/main_floppy.img ´´´
-
+  qemu-system-i386 -fda build/main_floppy.img
+```
 
 # Git Tools (im a noob)
-
+```
   git commit -m ""
-
   git push -u origin main
+```
