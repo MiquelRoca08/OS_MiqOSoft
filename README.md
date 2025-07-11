@@ -9,10 +9,16 @@ This is an x86 OS built from scratch
 ```
 apt install make nasm qemu-system qemu-utils
 ```
-# Testing
+# Testing with QEMU
 ```
 make
-qemu-system-i386 -fda build/main_floppy.img
+./run.sh
+```
+
+# Debugging with Bochs
+```
+make
+./debug.sh
 ```
 
 # Git Tools (im a noob)
