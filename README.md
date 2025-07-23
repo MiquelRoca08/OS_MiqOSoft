@@ -33,10 +33,11 @@ Minimalist operating system developed as a personal project.
 
 # Prerequisites
 - Linux or WSL
-- Make
-- NASM (as assembler)
-- QEMU (as virtualization software)
-- Bochs (as debugger)
+- `Make`
+- `NASM` (as assembler)
+- `qemu-system-x86` (as virtualization software)
+- `bochs-x bochsbios vgabios` (as debugger)
+- Open Watcom
 ```
 apt install make nasm qemu-system qemu-utils bochs bochs-sdl bochsbios vgabios
 ```
@@ -60,7 +61,7 @@ make
 ---
 
 
-# Git Tools (im a noob)
+# Git Tools (cuz im a noob)
 ```
 git commit -m ""
 git push -u origin main
