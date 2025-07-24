@@ -1,2 +1,3 @@
 build/
 .vscode/
+src/bootloader/stage2/main.err

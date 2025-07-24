@@ -1,7 +1,7 @@
 ASM=nasm
 CC=gcc
-CC16=/usr/bin/watcom/binl/wcc
-LD16=/usr/bin/watcom/binl/wlink
+CC16=/mnt/c/WATCOM/binnt64/wcc.exe
+LD16=/mnt/c/WATCOM/binnt64/wlink.exe
 
 SRC_DIR=src
 TOOLS_DIR=tools
