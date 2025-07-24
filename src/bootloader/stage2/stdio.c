@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <x86.h>
+#include "stdio.h"
+#include "x86.h"
 
 void putc(char c) 
 {
