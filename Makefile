@@ -3,9 +3,9 @@ CC=gcc
 CC16=/mnt/c/WATCOM/binnt64/wcc.exe
 LD16=/mnt/c/WATCOM/binnt64/wlink.exe
 
-SRC_DIR=src
-TOOLS_DIR=tools
-BUILD_DIR=build
+SRC_DIR=src/
+TOOLS_DIR=tools/
+BUILD_DIR=build/
 
 .PHONY: all floppy_image kernel bootloader clean always tools_fat
 
