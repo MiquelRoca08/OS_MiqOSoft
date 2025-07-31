@@ -56,13 +56,3 @@ make
 ```
 make
 ./debug.sh
-```
-
----
-
-
-# Git Tools (cuz im a noob)
-```
-git commit -m ""
-git push -u origin main
-```
