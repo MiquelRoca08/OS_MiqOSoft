@@ -1,4 +1,4 @@
-# OS_MicOSoft
+# OS_MiqOSoft
 
 Minimalist operating system developed as a personal project.
 
@@ -130,4 +130,5 @@ The project uses a custom cross-compiler toolchain for i686-elf target. The tool
 ```bash
 # Build toolchain manually
 scons toolchain
+
 ```
