@@ -3,6 +3,7 @@
 #include "memory.h"
 #include <hal/hal.h>
 #include <arch/i686/irq.h>
+#include <debug.h>
 
 extern uint8_t __bss_start;
 extern uint8_t __end;
@@ -25,10 +26,13 @@ void __attribute__((section(".entry"))) start(uint16_t bootDrive)
 
     HAL_Initialize();
 
-    clrscr();
-
-    printf("Hello from kernel!\n");
-
+    log_debug("Main", "This is a debug msg!");
+    log_info("Main", "This is an info msg!");
+    log_warn("Main", "This is a warnibng msg!");
+    log_err("Main", "This is an error msg!");
+    log_crit("Main", "This is a critical msg!");
+    printf("OS MiqOSoft v0.12\n");
+    printf("This operating system is under construction.\n");
     //i686_IRQ_RegisterHandler(0, timer);
 
     //crash_me();

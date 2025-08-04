@@ -51,18 +51,24 @@ Minimalist operating system developed as a personal project.
 - NASM assembler
 - QEMU for emulation
 - Bochs for debugging
+- libguestfs-tools (for disk image creation)
 
 ### Installation on Ubuntu/WSL2
 ```bash
 # Install basic dependencies
 sudo apt update
-sudo apt install python3 python3-pip nasm qemu-system-x86 qemu-utils
+sudo apt install python3 python3-pip nasm qemu-system-x86 qemu-utils libguestfs-tools
 
 # Install SCons
 pip install scons
 
 # Install Bochs (optional, for debugging)
 sudo apt install bochs bochs-sdl bochsbios vgabios
+
+# Set required environment variables for libguestfs
+echo 'export LIBGUESTFS_BACKEND=direct' >> ~/.bashrc
+echo 'export LIBGUESTFS_BACKEND_SETTINGS=force_tcg' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ---
@@ -70,22 +76,28 @@ sudo apt install bochs bochs-sdl bochsbios vgabios
 ## Building
 
 ```bash
-# Build the entire project
-scons
+# Build the entire project (sudo required for disk image creation)
+sudo scons
 
 # Build with specific configuration
-scons config=debug arch=i686 imageType=disk
+sudo scons config=debug arch=i686 imageType=disk
 ```
 
 ## Running
 
 ```bash
-# Run in QEMU
-scons run
+# Run in QEMU (sudo required due to disk image access)
+sudo scons run
 
 # Debug with Bochs
-scons bochs
+sudo scons bochs
 ```
+
+### Note on Sudo Requirements
+The build process requires sudo privileges due to libguestfs requirements for disk image creation and mounting. This is necessary for:
+- Creating the disk image
+- Mounting the image to copy files
+- Running the emulator with direct disk access
 
 ## Build Configuration Options
 

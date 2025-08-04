@@ -76,6 +76,7 @@ void scrollback(int lines)
 
 void putc(char c)
 {
+    x86_outb(0xE9, c);
     switch (c)
     {
         case '\n':
@@ -290,6 +291,7 @@ void printf(const char* fmt, ...)
                 length = PRINTF_LENGTH_DEFAULT;
                 radix = 10;
                 sign = false;
+                number = false;
                 break;
         }
 
