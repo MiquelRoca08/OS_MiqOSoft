@@ -7,6 +7,8 @@
 extern uint8_t __bss_start;
 extern uint8_t __end;
 
+extern void _init();
+
 void crash_me();
 
 void timer(Registers* regs)
@@ -17,6 +19,9 @@ void timer(Registers* regs)
 void __attribute__((section(".entry"))) start(uint16_t bootDrive)
 {
     memset(&__bss_start, 0, (&__end) - (&__bss_start));
+    
+    // call global constructors
+    _init();
 
     HAL_Initialize();
 
@@ -24,7 +29,7 @@ void __attribute__((section(".entry"))) start(uint16_t bootDrive)
 
     printf("Hello from kernel!\n");
 
-    i686_IRQ_RegisterHandler(0, timer);
+    //i686_IRQ_RegisterHandler(0, timer);
 
     //crash_me();
 

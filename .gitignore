@@ -3,3 +3,4 @@ toolchain/
 .vscode/
 *.err
 bx_enh_dbg.ini
+.sconsign.dblite
