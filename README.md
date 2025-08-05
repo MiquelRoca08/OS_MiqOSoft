@@ -12,6 +12,10 @@ Minimalist operating system developed as a personal project.
 - Compatible with both FAT12 (floppy) and FAT32 (disk) file systems
 - Modular architecture with stage1 and stage2 bootloaders
 - Cross-platform build system using SCons
+- Support for i686 architecture
+- Memory management and paging
+- Hardware interrupt handling
+- Custom build scripts and tools
 
 ---
 
@@ -31,14 +35,21 @@ Minimalist operating system developed as a personal project.
   - Device drivers
   - File system implementation
   - Interrupt handling
+  - Hardware abstraction layer
 
 ### Build System
 - `SConstruct`  
   Main build configuration file
+- `build_scripts/`  
+  Python build configuration and utility scripts
 - `image/`  
-  Disk image creation scripts
+  Disk image creation and management
 - `scripts/`  
-  Build and development helper scripts
+  Development and debugging helper scripts
+
+### Tools
+- `tools/`  
+  Custom development and build tools
 
 ---
 
@@ -91,6 +102,9 @@ sudo scons run
 
 # Debug with Bochs
 sudo scons bochs
+
+# Run with debug output
+./scripts/debug.sh
 ```
 
 ### Note on Sudo Requirements
@@ -107,6 +121,19 @@ The build process requires sudo privileges due to libguestfs requirements for di
 - `imageSize`: Size of disk image (e.g., `250m`)
 - `imageFS`: File system type (`fat12` or `fat32`)
 
+## Development Tools
+
+### Scripts
+- `scripts/bochs.sh`: Launch Bochs debugger
+- `scripts/debug.sh`: Run with debug output
+- `scripts/run.sh`: Quick QEMU launch
+- `scripts/setup_toolchain.sh`: Set up development environment
+
+### Build Scripts
+- `build_scripts/config.py`: Build configuration
+- `build_scripts/generate_isrs.sh`: Generate interrupt handlers
+- `build_scripts/utility.py`: Build utility functions
+
 ---
 
 ## Development
@@ -119,9 +146,11 @@ The build process requires sudo privileges due to libguestfs requirements for di
 │   │   ├── stage1/
 │   │   └── stage2/
 │   └── kernel/
+├── build_scripts/
 ├── image/
 ├── scripts/
-└── toolchain/
+├── tools/
+└── build/
 ```
 
 ### Toolchain
@@ -130,5 +159,15 @@ The project uses a custom cross-compiler toolchain for i686-elf target. The tool
 ```bash
 # Build toolchain manually
 scons toolchain
+```
 
+### Debug Builds
+Debug builds include additional symbols and logging:
+
+```bash
+# Build with debug configuration
+sudo scons config=debug
+
+# Run with debug output
+./scripts/debug.sh
 ```
