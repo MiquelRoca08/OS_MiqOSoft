@@ -26,7 +26,7 @@ void start(uint16_t bootDrive)
     log_warn("Main", "This is a warning msg!");
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
-    printf("OS MiqOSoft v0.13\n");
+    printf("OS MiqOSoft v0.14\n");
     printf("This operating system is under construction.\n");
     //i686_IRQ_RegisterHandler(0, timer);
 

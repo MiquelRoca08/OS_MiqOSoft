@@ -1,5 +1,4 @@
 build/
-toolchain/
 .vscode/
 *.err
 bx_enh_dbg.ini
