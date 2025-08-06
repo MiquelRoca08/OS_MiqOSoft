@@ -3,8 +3,10 @@
 #include "memory.h"
 #include <hal/hal.h>
 #include <arch/i686/irq.h>
+#include <arch/i686/io.h>
 #include <debug.h>
 #include <boot/bootparams.h>
+#include "drivers/keyboard.h"
 
 extern void _init();
 
@@ -22,6 +24,11 @@ void start(BootParams* bootParams)
 
     HAL_Initialize();
 
+    keyboard_init();
+    
+    i686_IRQ_RegisterHandler(1, keyboard_handler); // IRQ 1 es para el teclado PS/2
+    i686_EnableInterrupts(); // Habilitar interrupciones explícitamente
+    
     log_debug("Main", "Boot device: %x", bootParams->BootDevice);
     log_debug("Main", "Memory region count: %d", bootParams->Memory.RegionCount);
     for (int i = 0; i < bootParams->Memory.RegionCount; i++) 
@@ -37,7 +44,7 @@ void start(BootParams* bootParams)
     log_warn("Main", "This is a warning msg!");
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
-    printf("OS MiqOSoft v0.15\n");
+    printf("OS MiqOSoft v0.16\n");
     printf("This operating system is under construction.\n");
     //i686_IRQ_RegisterHandler(0, timer);
 
