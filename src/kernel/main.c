@@ -45,7 +45,7 @@ void start(BootParams* bootParams)
     log_warn("Main", "This is a warning msg!");
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
-    printf("OS MiqOSoft v0.16\n");
+    printf("OS MiqOSoft v0.16.1\n");
     printf("This operating system is under construction.\n");
 
     g_ScreenY = 2;  // Línea 2 para input
