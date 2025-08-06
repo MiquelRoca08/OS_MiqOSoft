@@ -7,6 +7,7 @@
 #include <debug.h>
 #include <boot/bootparams.h>
 #include "drivers/keyboard.h"
+#include "arch/i686/vga_text.h"
 
 extern void _init();
 
@@ -46,6 +47,15 @@ void start(BootParams* bootParams)
     log_crit("Main", "This is a critical msg!");
     printf("OS MiqOSoft v0.16\n");
     printf("This operating system is under construction.\n");
+
+    g_ScreenY = 2;  // Línea 2 para input
+    g_ScreenX = 0;
+    redraw_input_line(); // limpia solo esa línea para la entrada
+
+    while (1) {
+        keyboard_process_buffer();
+        // Aquí puedes añadir más cosas como scheduling, otras tareas, etc.
+    }
     //i686_IRQ_RegisterHandler(0, timer);
 
     //crash_me();

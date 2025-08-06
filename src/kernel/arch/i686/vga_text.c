@@ -41,6 +41,14 @@ void VGA_setcursor(int x, int y)
     i686_outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
+int VGA_get_cursor_x() {
+    return g_ScreenX;
+}
+
+int VGA_get_cursor_y() {
+    return g_ScreenY;
+}
+
 void VGA_clrscr()
 {
     for (int y = 0; y < SCREEN_HEIGHT; y++)

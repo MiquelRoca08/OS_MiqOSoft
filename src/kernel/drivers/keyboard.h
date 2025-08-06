@@ -1,5 +1,4 @@
-#ifndef KEYBOARD_H
-#define KEYBOARD_H
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -23,9 +22,12 @@
 #define KEY_DEAD_KEY 0xFF
 
 // Funciones públicas
+void redraw_input_line(void);
 void keyboard_init(void);
 void keyboard_handler(Registers* regs);
+void keyboard_process_buffer(void);
 char keyboard_get_scancode(void);
 char keyboard_scancode_to_ascii(uint8_t scancode);
-
-#endif // KEYBOARD_H
+void keyboard_reset_dead_state(void);
+int keyboard_is_caps_lock_on(void);
+void keyboard_set_caps_lock(int state);
