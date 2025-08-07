@@ -26,6 +26,7 @@ void start(BootParams* bootParams)
     HAL_Initialize();
 
     keyboard_init();
+    screen_init();
     
     i686_IRQ_RegisterHandler(1, keyboard_handler); // IRQ 1 es para el teclado PS/2
     i686_EnableInterrupts(); // Habilitar interrupciones explícitamente
