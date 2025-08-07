@@ -16,6 +16,7 @@ Minimalist operating system developed as a personal project.
 - Memory management and paging
 - Hardware interrupt handling
 - Custom build scripts and tools
+- Keyboard drivers for most of alphanumerical characters
 
 ---
 
@@ -146,6 +147,11 @@ The build process requires sudo privileges due to libguestfs requirements for di
 │   │   ├── stage1/
 │   │   └── stage2/
 │   └── kernel/
+│       ├── arch/i686/
+│       ├── drivers/
+│       ├── hal
+│       └── util
+├── tools/
 ├── build_scripts/
 ├── image/
 ├── scripts/
@@ -170,4 +176,5 @@ sudo scons config=debug
 
 # Run with debug output
 ./scripts/debug.sh
+
 ```
