@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <vga_text.h"
+#include <vga_text.h>
 #include <memory.h>
 
 /*
