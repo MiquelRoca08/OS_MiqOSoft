@@ -1,10 +1,10 @@
-#include "keyboard.h"
+#include <keyboard.h>
 #include <io.h>
 #include <isr.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <vga_text.h>
+#include <vga_text.h"
 #include <memory.h>
 
 /*
@@ -93,8 +93,8 @@
 char input_lines[MAX_LINES][LINE_LENGTH];
 int line_lengths[MAX_LINES];
 
-int total_lines_used = 1;
-int cursor_line = 2;
+int total_lines_used = 1; // empezamos con una línea para input
+int cursor_line = 2;      // línea actual de edición (empezamos en 0)
 int cursor_pos = 0;
 
 static int shift_pressed = 0;
@@ -103,7 +103,7 @@ static int caps_lock = 0;
 static int extended_key = 0;
 static uint8_t dead_key_state = DEAD_NONE;
 
-// Circual Buffer
+// Buffer circular para teclado
 static char key_buffer[KEYBOARD_BUFFER_SIZE];
 static int kb_head = 0;
 static int kb_tail = 0;
@@ -172,7 +172,7 @@ static const KeyMapping keymap[] = {
     {0x39, ' ', ' ', ' ', false}
 };
 
-// Dead keys compositions
+// Composiciones para dead keys
 typedef struct {
     uint8_t dead_type;
     char base_char;
@@ -232,6 +232,7 @@ void keyboard_init(void) {
 }
 
 char keyboard_get_scancode(void) {
+    // Espera hasta que el buffer de salida tenga datos
     while (!(i686_inb(KEYBOARD_STATUS_PORT) & KEYBOARD_OUTPUT_BUFFER_FULL));
     return i686_inb(KEYBOARD_DATA_PORT);
 }
@@ -277,17 +278,17 @@ static char apply_caps_lock(char ascii) {
     return ascii;
 }
 
-// Circular Buffer
+// Buffer circular para teclado
 bool keyboard_buffer_push(char c) {
     int next = (kb_head + 1) % KEYBOARD_BUFFER_SIZE;
-    if (next == kb_tail) return false;
+    if (next == kb_tail) return false; // buffer lleno
     key_buffer[kb_head] = c;
     kb_head = next;
     return true;
 }
 
 bool keyboard_buffer_pop(char* c) {
-    if (kb_head == kb_tail) return false;
+    if (kb_head == kb_tail) return false; // vacío
     *c = key_buffer[kb_tail];
     kb_tail = (kb_tail + 1) % KEYBOARD_BUFFER_SIZE;
     return true;
@@ -297,6 +298,7 @@ bool keyboard_buffer_empty(void) {
     return kb_head == kb_tail;
 }
 
+// Redibuja la línea actual en pantalla
 void redraw_input_line() {
     int y = cursor_line;
     for (int x = 0; x < LINE_LENGTH; x++) {
@@ -310,9 +312,10 @@ void redraw_input_line() {
     VGA_setcursor(g_ScreenX, g_ScreenY);
 }
 
+// Maneja la tecla delete (suprimir) en línea actual
 void handle_delete_key() {
     int len = line_lengths[cursor_line];
-    if (cursor_pos >= len) return;
+    if (cursor_pos >= len) return; // nada que borrar
 
     for (int i = cursor_pos; i < len - 1; i++) {
         input_lines[cursor_line][i] = input_lines[cursor_line][i + 1];
@@ -322,6 +325,7 @@ void handle_delete_key() {
     redraw_input_line();
 }
 
+// Avanza a la siguiente línea al pulsar Enter
 void handle_enter_multiline() {
     if (cursor_line < MAX_LINES - 1) {
         cursor_line++;
@@ -335,6 +339,7 @@ void handle_enter_multiline() {
     redraw_input_line();
 }
 
+// Maneja teclas de flecha
 void handle_arrow_key(uint8_t scancode) {
     switch (scancode) {
         case KEY_LEFT:
@@ -361,6 +366,7 @@ void handle_arrow_key(uint8_t scancode) {
     redraw_input_line();
 }
 
+// Borrar carácter anterior con backspace
 void backspace_multiline() {
     if (cursor_pos == 0) return;
 
@@ -373,8 +379,9 @@ void backspace_multiline() {
     redraw_input_line();
 }
 
+// Insertar carácter en la línea actual
 void insert_char_multiline(char ascii) {
-    if (line_lengths[cursor_line] >= LINE_LENGTH - 1) return;
+    if (line_lengths[cursor_line] >= LINE_LENGTH - 1) return; // línea llena
 
     for (int i = line_lengths[cursor_line]; i > cursor_pos; i--) {
         input_lines[cursor_line][i] = input_lines[cursor_line][i - 1];
@@ -385,6 +392,7 @@ void insert_char_multiline(char ascii) {
     redraw_input_line();
 }
 
+// Procesa el buffer de teclado (mostrar texto en pantalla)
 void keyboard_process_buffer(void) {
     char c;
     while (keyboard_buffer_pop(&c)) {
@@ -407,7 +415,7 @@ void keyboard_handler(Registers* regs) {
             case KEY_ALTGR:
                 altgr_pressed = 1;
                 return;
-            case 0xB8: // Released AltGr
+            case 0xB8:  // AltGr soltado
                 altgr_pressed = 0;
                 return;
             case KEY_UP:
