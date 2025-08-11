@@ -5,7 +5,7 @@
 #include <arch/i686/irq.h>
 #include <arch/i686/io.h>
 #include <debug.h>
-#include <boot/bootparams.h>
+#include "../libs/boot/bootparams.h"
 #include "drivers/keyboard.h"
 #include "arch/i686/vga_text.h"
 
@@ -26,7 +26,6 @@ void start(BootParams* bootParams)
     HAL_Initialize();
 
     keyboard_init();
-    screen_init();
     
     i686_IRQ_RegisterHandler(1, keyboard_handler); // IRQ 1 es para el teclado PS/2
     i686_EnableInterrupts(); // Habilitar interrupciones explícitamente
