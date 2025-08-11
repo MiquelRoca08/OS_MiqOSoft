@@ -1,10 +1,10 @@
 #include <stdio.h>
-#include <arch/i686/io.h>
+#include <io.h>
 
 #include <stdarg.h>
 #include <stdbool.h>
 
-#include <hal/vfs.h>
+#include <vfs.h>
 
 void fputc(char c, fd_t file)
 {

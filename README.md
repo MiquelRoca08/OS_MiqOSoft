@@ -6,64 +6,73 @@ Minimalist operating system developed as a personal project.
 
 ## Main Features
 
-- Custom bootloader compatible with various BIOS types
-- Integrated FAT file system for managing files and directories
-- Basic read/write support on storage devices
-- Compatible with both FAT12 (floppy) and FAT32 (disk) file systems
-- Modular architecture with stage1 and stage2 bootloaders
-- Cross-platform build system using SCons
-- Support for i686 architecture
-- Memory management and paging
-- Hardware interrupt handling
-- Custom build scripts and tools
-- Keyboard drivers for most of alphanumerical characters
+- Custom bootloader compatible with various BIOS types  
+- Integrated FAT file system for managing files and directories  
+- Basic read/write support on storage devices  
+- Compatible with both FAT12 (floppy) and FAT32 (disk) file systems  
+- Modular architecture with stage1 and stage2 bootloaders  
+- Cross-platform build system using SCons  
+- Support for i686 architecture  
+- Memory management and paging  
+- Hardware interrupt handling  
+- Custom build scripts and tools  
+- Keyboard drivers for most alphanumerical characters
 
 ---
 
 ## Project Structure
 
+### Include Directory  
+- `include/`  
+  Centralized public header files (`*.h`) shared across the project, including kernel, bootloader, HAL, utilities, and drivers.  
+  This replaces scattered headers previously located inside source folders, simplifying include paths and maintenance.
+
 ### Bootloader
 - `src/bootloader/stage1/`  
-  First stage bootloader that fits in the MBR (446 bytes)
+  First stage bootloader that fits in the MBR (446 bytes)  
 
 - `src/bootloader/stage2/`  
-  Second stage bootloader with extended functionality
+  Second stage bootloader with extended functionality  
 
 ### Kernel
 - `src/kernel/`  
-  Core kernel components including:
-  - Memory management
-  - Device drivers
-  - File system implementation
-  - Interrupt handling
-  - Hardware abstraction layer
+  Core kernel components including:  
+  - Memory management  
+  - Device drivers  
+  - File system implementation  
+  - Interrupt handling  
+  - Hardware abstraction layer  
+
+### Libraries
+- `src/libs/core/`  
+  Core library in C++ under development for future refactoring and modernization of OS components.  
 
 ### Build System
 - `SConstruct`  
-  Main build configuration file
+  Main build configuration file  
 - `build_scripts/`  
-  Python build configuration and utility scripts
+  Python build configuration and utility scripts  
 - `image/`  
-  Disk image creation and management
+  Disk image creation and management  
 - `scripts/`  
-  Development and debugging helper scripts
+  Development and debugging helper scripts  
 
 ### Tools
 - `tools/`  
-  Custom development and build tools
+  Custom development and build tools  
 
 ---
 
 ## Prerequisites
 
 ### Required Software
-- Linux/WSL2
-- Python 3.12 or newer
-- SCons build system
-- NASM assembler
-- QEMU for emulation
-- Bochs for debugging
-- libguestfs-tools (for disk image creation)
+- Linux/WSL2  
+- Python 3.12 or newer  
+- SCons build system  
+- NASM assembler  
+- QEMU for emulation  
+- Bochs for debugging  
+- libguestfs-tools (for disk image creation)  
 
 ### Installation on Ubuntu/WSL2
 ```bash
@@ -82,7 +91,6 @@ echo 'export LIBGUESTFS_BACKEND=direct' >> ~/.bashrc
 echo 'export LIBGUESTFS_BACKEND_SETTINGS=force_tcg' >> ~/.bashrc
 source ~/.bashrc
 ```
-
 ---
 
 ## Building
@@ -142,20 +150,22 @@ The build process requires sudo privileges due to libguestfs requirements for di
 ### Directory Structure
 ```
 .
+├── include/                  # Centralized public headers (.h)
 ├── src/
 │   ├── bootloader/
 │   │   ├── stage1/
 │   │   └── stage2/
-│   └── kernel/
-│       ├── arch/i686/
-│       ├── drivers/
-│       ├── hal
-│       └── util
+│   ├── kernel/
+│   │   ├── arch/i686/
+│   │   ├── drivers/
+│   │   ├── hal/
+│   │   └── util/
+│   └── libs/
+│       └── core/
 ├── tools/
 ├── build_scripts/
 ├── image/
 ├── scripts/
-├── tools/
 └── build/
 ```
 
@@ -178,3 +188,9 @@ sudo scons config=debug
 ./scripts/debug.sh
 
 ```
+### Notes
+Keyboard driver header (keyboard.h) has been moved to include/ to provide shared access for other kernel modules and future shell integration.
+
+The include/ folder centralizes all public headers, simplifying include paths and project maintenance.
+
+src/libs/core/ holds the beginnings of a C++ refactor that is ongoing and can coexist with the C codebase.

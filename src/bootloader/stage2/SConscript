@@ -14,6 +14,7 @@ env.Append(
     ],
     CPPPATH = [ 
         env.Dir('.').srcnode(),
+        env['PROJECTDIR'].Dir('include'),
         env['PROJECTDIR'].Dir('src/libs')
     ],
     ASFLAGS = [ 
