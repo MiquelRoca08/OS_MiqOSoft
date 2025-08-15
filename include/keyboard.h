@@ -31,3 +31,4 @@ char keyboard_scancode_to_ascii(uint8_t scancode);
 void keyboard_reset_dead_state(void);
 int keyboard_is_caps_lock_on(void);
 void keyboard_set_caps_lock(int state);
+bool keyboard_buffer_pop(char* c);

@@ -8,6 +8,7 @@
 #include "../libs/boot/bootparams.h"
 #include <keyboard.h>
 #include <vga_text.h>
+#include "shell.h"
 
 extern void _init();
 
@@ -40,25 +41,21 @@ void start(BootParams* bootParams)
             bootParams->Memory.Regions[i].Type);
     }
 
-
     log_info("Main", "This is an info msg!");
     log_warn("Main", "This is a warning msg!");
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
-    printf("OS MiqOSoft v0.16.1\n");
-    printf("This operating system is under construction.\n");
+    
+    printf("OS MiqOSoft v0.17\n");
+    printf("This operating system is under construction.\n\n");
 
-    g_ScreenY = 2;
-    g_ScreenX = 0;
-    redraw_input_line();
+    // Inicializar la shell
+    shell_init();
 
+    // Loop principal - ahora manejado por la shell
     while (1) {
-        keyboard_process_buffer();
-
+        shell_run();
     }
-    //i686_IRQ_RegisterHandler(0, timer);
-
-    //crash_me();
 
 end:
     for (;;);

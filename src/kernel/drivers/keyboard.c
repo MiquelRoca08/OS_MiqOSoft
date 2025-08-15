@@ -48,10 +48,6 @@
 #define KEY_F10             0x44
 
 // Extended keys (preceded by 0xE0)
-#define KEY_UP              0x48
-#define KEY_DOWN            0x50
-#define KEY_LEFT            0x4B
-#define KEY_RIGHT           0x4D
 #define KEY_DELETE          0x53
 #define KEY_ALTGR           0x38 
 
@@ -93,8 +89,8 @@
 char input_lines[MAX_LINES][LINE_LENGTH];
 int line_lengths[MAX_LINES];
 
-int total_lines_used = 1; // empezamos con una línea para input
-int cursor_line = 2;      // línea actual de edición (empezamos en 0)
+int total_lines_used = 1;
+int cursor_line = 2;
 int cursor_pos = 0;
 
 static int shift_pressed = 0;
@@ -339,33 +335,6 @@ void handle_enter_multiline() {
     redraw_input_line();
 }
 
-// Maneja teclas de flecha
-void handle_arrow_key(uint8_t scancode) {
-    switch (scancode) {
-        case KEY_LEFT:
-            if (cursor_pos > 0) cursor_pos--;
-            break;
-        case KEY_RIGHT:
-            if (cursor_pos < line_lengths[cursor_line]) cursor_pos++;
-            break;
-        case KEY_UP:
-            if (cursor_line > 0) {
-                cursor_line--;
-                if (cursor_pos > line_lengths[cursor_line])
-                    cursor_pos = line_lengths[cursor_line];
-            }
-            break;
-        case KEY_DOWN:
-            if (cursor_line < total_lines_used - 1) {
-                cursor_line++;
-                if (cursor_pos > line_lengths[cursor_line])
-                    cursor_pos = line_lengths[cursor_line];
-            }
-            break;
-    }
-    redraw_input_line();
-}
-
 // Borrar carácter anterior con backspace
 void backspace_multiline() {
     if (cursor_pos == 0) return;
@@ -393,15 +362,6 @@ void insert_char_multiline(char ascii) {
 }
 
 // Procesa el buffer de teclado (mostrar texto en pantalla)
-void keyboard_process_buffer(void) {
-    char c;
-    while (keyboard_buffer_pop(&c)) {
-        if (c == '\b') backspace_multiline();
-        else if (c == '\n') handle_enter_multiline();
-        else insert_char_multiline(c);
-    }
-}
-
 void keyboard_handler(Registers* regs) {
     uint8_t scancode = keyboard_get_scancode();
 
@@ -418,12 +378,6 @@ void keyboard_handler(Registers* regs) {
             case 0xB8:  // AltGr soltado
                 altgr_pressed = 0;
                 return;
-            case KEY_UP:
-            case KEY_DOWN:
-            case KEY_LEFT:
-            case KEY_RIGHT:
-                handle_arrow_key(scancode);
-                break;
             case KEY_DELETE:
                 handle_delete_key();
                 break;
@@ -497,4 +451,25 @@ int keyboard_is_caps_lock_on(void) {
 
 void keyboard_set_caps_lock(int state) {
     caps_lock = state;
+}
+
+static bool shell_mode = false;
+
+// Función para activar/desactivar el modo shell
+void keyboard_set_shell_mode(bool enabled) {
+    shell_mode = enabled;
+}
+
+// Modificar la función keyboard_process_buffer para no hacer nada en modo shell:
+void keyboard_process_buffer(void) {
+    if (shell_mode) {
+        return; // No procesar en modo shell - la shell maneja directamente el buffer
+    }
+    
+    char c;
+    while (keyboard_buffer_pop(&c)) {
+        if (c == '\b') backspace_multiline();
+        else if (c == '\n') handle_enter_multiline();
+        else insert_char_multiline(c);
+    }
 }
