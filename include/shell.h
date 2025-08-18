@@ -67,6 +67,7 @@ int cmd_rm(int argc, char* argv[]);
 int cmd_lsmod(int argc, char* argv[]);
 int cmd_dmesg(int argc, char* argv[]);
 int cmd_ps(int argc, char* argv[]);
+int cmd_history(int argc, char* argv[]);
 
 // Comandos de sistema y hardware
 int cmd_memtest(int argc, char* argv[]);

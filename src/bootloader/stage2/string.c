@@ -42,15 +42,11 @@ char* strcpy(char* dst, const char* src)
     return origDst;
 }
 
-unsigned strlen(const char* str)
-{
+unsigned strlen(const char* str) {
     unsigned len = 0;
-    while (*str)
-    {
-        ++len;
-        ++str;
+    while (str[len] != '\0') {
+        len++;
     }
-
     return len;
 }
 

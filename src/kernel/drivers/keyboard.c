@@ -47,6 +47,11 @@
 #define KEY_F9              0x43
 #define KEY_F10             0x44
 
+#define KEY_UP              0x48
+#define KEY_DOWN            0x50
+#define KEY_LEFT            0x4B
+#define KEY_RIGHT           0x4D
+
 // Extended keys (preceded by 0xE0)
 #define KEY_DELETE          0x53
 #define KEY_ALTGR           0x38 
@@ -378,6 +383,22 @@ void keyboard_handler(Registers* regs) {
             case 0xB8:  // AltGr soltado
                 altgr_pressed = 0;
                 return;
+            case KEY_UP:
+                // Enviar código especial para historial arriba
+                keyboard_buffer_push(0x01);  // Código especial para UP
+                return;
+            case KEY_DOWN:
+                // Enviar código especial para historial abajo
+                keyboard_buffer_push(0x02);  // Código especial para DOWN
+                return;
+            case KEY_LEFT:
+                // Código especial para mover cursor izquierda
+                keyboard_buffer_push(0x03);  // Código especial para LEFT
+                return;
+            case KEY_RIGHT:
+                // Código especial para mover cursor derecha
+                keyboard_buffer_push(0x04);  // Código especial para RIGHT
+                return;
             case KEY_DELETE:
                 handle_delete_key();
                 break;
@@ -385,6 +406,7 @@ void keyboard_handler(Registers* regs) {
         return;
     }
 
+    // Resto del código existente sin cambios...
     if (scancode & KEY_RELEASE) {
         uint8_t key = scancode & ~KEY_RELEASE;
         if (key == KEY_SHIFT || key == KEY_RSHIFT) shift_pressed = 0;

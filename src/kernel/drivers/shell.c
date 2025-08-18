@@ -6,11 +6,139 @@
 #include <io.h>
 #include <debug.h>
 #include <hal.h>
+#include <string.h>
+
+#define HISTORY_SIZE 50
+#define COMMAND_MAX_LEN 256
 
 // Buffer para la línea de comandos actual
 static char command_buffer[SHELL_BUFFER_SIZE];
 static int command_pos = 0;
 static bool shell_running = false;
+
+static char command_history[HISTORY_SIZE][COMMAND_MAX_LEN];
+static int history_count = 0;
+static int history_index = -1;  // -1 significa comando actual (no en historial)
+static char current_command_backup[COMMAND_MAX_LEN];  // Backup del comando actual
+
+void history_add_command(const char* command) {
+    if (!command || shell_strlen(command) == 0) return;  // CAMBIADO: strlen -> shell_strlen
+    
+    // No agregar comandos duplicados consecutivos
+    if (history_count > 0 && 
+        shell_strcmp(command_history[(history_count - 1) % HISTORY_SIZE], command) == 0) {
+        return;
+    }
+    
+    // Copiar comando al historial
+    shell_strncpy(command_history[history_count % HISTORY_SIZE], command, COMMAND_MAX_LEN - 1);
+    command_history[history_count % HISTORY_SIZE][COMMAND_MAX_LEN - 1] = '\0';
+    
+    history_count++;
+    history_index = -1;  // Reset índice de navegación
+}
+
+const char* history_get_previous(void) {
+    if (history_count == 0) return NULL;
+    
+    if (history_index == -1) {
+        // Primera vez navegando hacia atrás - guardar comando actual
+        shell_strncpy(current_command_backup, command_buffer, COMMAND_MAX_LEN - 1);
+        history_index = (history_count - 1) % HISTORY_SIZE;
+    } else {
+        // Navegar hacia atrás en el historial
+        if (history_count < HISTORY_SIZE) {
+            if (history_index > 0) history_index--;
+        } else {
+            history_index = (history_index - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+            if (history_index == (history_count % HISTORY_SIZE)) {
+                // Hemos llegado al comando más antiguo
+                history_index = (history_index + 1) % HISTORY_SIZE;
+                return command_history[history_index];
+            }
+        }
+    }
+    
+    return command_history[history_index];
+}
+
+const char* history_get_next(void) {
+    if (history_count == 0 || history_index == -1) return NULL;
+    
+    if (history_count < HISTORY_SIZE) {
+        if (history_index < history_count - 1) {
+            history_index++;
+            return command_history[history_index];
+        } else {
+            // Volver al comando actual
+            history_index = -1;
+            return current_command_backup;
+        }
+    } else {
+        history_index = (history_index + 1) % HISTORY_SIZE;
+        if (history_index == (history_count % HISTORY_SIZE)) {
+            // Volver al comando actual
+            history_index = -1;
+            return current_command_backup;
+        }
+        return command_history[history_index];
+    }
+}
+
+void shell_clear_line(void) {
+    // Borrar visualmente la línea actual
+    extern int g_ScreenX, g_ScreenY;
+    int prompt_len = shell_strlen(SHELL_PROMPT);  // YA ESTÁ CORRECTO
+    
+    // Ir al inicio de la línea (después del prompt)
+    g_ScreenX = prompt_len;
+    VGA_setcursor(g_ScreenX, g_ScreenY);
+    
+    // Borrar hasta el final de la línea
+    for (int i = 0; i < command_pos; i++) {
+        printf(" ");
+    }
+    
+    // Volver al inicio
+    g_ScreenX = prompt_len;
+    VGA_setcursor(g_ScreenX, g_ScreenY);
+}
+
+void shell_display_command(const char* cmd) {
+    // Limpiar línea actual
+    shell_clear_line();
+    
+    // Copiar nuevo comando
+    shell_strncpy(command_buffer, cmd, SHELL_BUFFER_SIZE - 1);
+    command_buffer[SHELL_BUFFER_SIZE - 1] = '\0';
+    command_pos = shell_strlen(command_buffer);  // CAMBIADO: strlen -> shell_strlen
+    
+    // Mostrar el comando
+    printf("%s", command_buffer);
+}
+
+// Cursor position within the command line (for LEFT/RIGHT arrows)
+static int cursor_position = 0;
+
+void shell_move_cursor_left(void) {
+    if (cursor_position > 0) {
+        cursor_position--;
+        extern int g_ScreenX, g_ScreenY;
+        if (g_ScreenX > shell_strlen(SHELL_PROMPT)) {
+            g_ScreenX--;
+            VGA_setcursor(g_ScreenX, g_ScreenY);
+        }
+    }
+}
+
+void shell_move_cursor_right(void) {
+    if (cursor_position < command_pos) {
+        cursor_position++;
+        extern int g_ScreenX, g_ScreenY;
+        g_ScreenX++;
+        VGA_setcursor(g_ScreenX, g_ScreenY);
+    }
+}
 
 // Implementaciones simples de funciones de string para evitar conflictos
 int shell_strlen(const char* str) {
@@ -71,6 +199,7 @@ static ShellCommand shell_commands[] = {
     {"panic",    "Trigger a kernel panic (for testing)",      cmd_panic},
     {"memory",   "Show memory information",                   cmd_memory},
     {"uptime",   "Show system uptime",                        cmd_uptime},
+    {"history",  "Show command history",                      cmd_history},
     
     // Sistema de archivos
     {"ls",       "List directory contents",                   cmd_ls},
@@ -109,10 +238,20 @@ static ShellCommand shell_commands[] = {
 void shell_init(void) {
     memset(command_buffer, 0, sizeof(command_buffer));
     command_pos = 0;
+    cursor_position = 0;
     shell_running = true;
     
+    // Inicializar historial
+    memset(command_history, 0, sizeof(command_history));
+    history_count = 0;
+    history_index = -1;
+    
+    // IMPORTANTE: Activar el modo shell en el sistema de teclado
+    keyboard_set_shell_mode(true);
+    
     printf("MiqOSoft Shell v1.0\n");
-    printf("Type 'help' for a list of available commands.\n\n");
+    printf("Type 'help' for a list of available commands.\n");
+    printf("Use UP/DOWN arrows to navigate command history.\n\n");
     
     // Sincronizar el sistema de teclado con la posición actual del cursor VGA
     extern int cursor_line, cursor_pos, total_lines_used;
@@ -139,7 +278,6 @@ void shell_print_prompt(void) {
     total_lines_used = cursor_line + 1;
     line_lengths[cursor_line] = 0;
 }
-
 void shell_run(void) {
     char c;
     
@@ -151,45 +289,105 @@ void shell_run(void) {
             command_buffer[command_pos] = '\0';
             
             if (command_pos > 0) {
+                // Agregar al historial antes de procesar
+                history_add_command(command_buffer);
                 shell_process_command(command_buffer);
             }
             
-            // Reset buffer
+            // Reset buffer y cursor
             memset(command_buffer, 0, sizeof(command_buffer));
             command_pos = 0;
+            cursor_position = 0;
             shell_print_prompt();
             
         } else if (c == '\b') {
-            // Backspace - CORREGIDO
-            if (command_pos > 0) {
+            // Backspace
+            if (cursor_position > 0 && command_pos > 0) {
+                // Si el cursor no está al final, mover caracteres
+                if (cursor_position < command_pos) {
+                    for (int i = cursor_position - 1; i < command_pos - 1; i++) {
+                        command_buffer[i] = command_buffer[i + 1];
+                    }
+                }
+                
                 command_pos--;
+                cursor_position--;
                 command_buffer[command_pos] = '\0';
                 
-                // Mover cursor hacia atrás, escribir espacio, mover cursor hacia atrás otra vez
-                // Esto borra visualmente el carácter en pantalla
+                // Redibujar línea
                 extern int g_ScreenX, g_ScreenY;
-                if (g_ScreenX > 0) {
-                    g_ScreenX--;
-                    VGA_putchr(g_ScreenX, g_ScreenY, ' ');  // Escribir espacio
-                    VGA_setcursor(g_ScreenX, g_ScreenY);    // Reposicionar cursor
-                }
+                int prompt_len = shell_strlen(SHELL_PROMPT);  // YA ESTÁ CORRECTO
+                g_ScreenX = prompt_len;
+                VGA_setcursor(g_ScreenX, g_ScreenY);
+                
+                // Limpiar línea y redibujar
+                for (int i = 0; i <= command_pos + 1; i++) printf(" ");
+                g_ScreenX = prompt_len;
+                VGA_setcursor(g_ScreenX, g_ScreenY);
+                printf("%s", command_buffer);
+                
+                // Posicionar cursor
+                g_ScreenX = prompt_len + cursor_position;
+                VGA_setcursor(g_ScreenX, g_ScreenY);
             }
+            
+        } else if (c == 0x01) {
+            // UP - historial anterior
+            const char* prev_cmd = history_get_previous();
+            if (prev_cmd) {
+                shell_display_command(prev_cmd);
+                cursor_position = command_pos;
+            }
+            
+        } else if (c == 0x02) {
+            // DOWN - historial siguiente
+            const char* next_cmd = history_get_next();
+            if (next_cmd) {
+                shell_display_command(next_cmd);
+                cursor_position = command_pos;
+            }
+            
+        } else if (c == 0x03) {
+            // LEFT - mover cursor izquierda
+            shell_move_cursor_left();
+            
+        } else if (c == 0x04) {
+            // RIGHT - mover cursor derecha
+            shell_move_cursor_right();
             
         } else if (c >= 32 && c <= 126) {
             // Carácter imprimible
             if (command_pos < SHELL_BUFFER_SIZE - 1) {
-                command_buffer[command_pos] = c;
+                // Si cursor no está al final, insertar carácter
+                if (cursor_position < command_pos) {
+                    for (int i = command_pos; i > cursor_position; i--) {
+                        command_buffer[i] = command_buffer[i - 1];
+                    }
+                }
+                
+                command_buffer[cursor_position] = c;
                 command_pos++;
-                printf("%c", c); // Mostrar el carácter
+                cursor_position++;
+                
+                // Redibujar desde cursor hasta final
+                extern int g_ScreenX, g_ScreenY;
+                int start_x = g_ScreenX;
+                printf("%s", &command_buffer[cursor_position - 1]);
+                g_ScreenX = start_x + 1;
+                VGA_setcursor(g_ScreenX, g_ScreenY);
             }
-        }
-        // Nota: Otros caracteres especiales (como caracteres acentuados) 
-        // también deberían manejarse aquí si es necesario
-        else if (c != 0) {
-            // Manejar caracteres especiales (acentos, ñ, etc.)
+        } else if (c != 0) {
+            // Caracteres especiales (acentos, ñ, etc.)
             if (command_pos < SHELL_BUFFER_SIZE - 1) {
-                command_buffer[command_pos] = c;
+                if (cursor_position < command_pos) {
+                    for (int i = command_pos; i > cursor_position; i--) {
+                        command_buffer[i] = command_buffer[i - 1];
+                    }
+                }
+                
+                command_buffer[cursor_position] = c;
                 command_pos++;
+                cursor_position++;
                 printf("%c", c);
             }
         }
@@ -271,6 +469,25 @@ int cmd_help(int argc, char* argv[]) {
                shell_commands[i].description);
     }
     printf("\n");
+    return 0;
+}
+
+int cmd_history(int argc, char* argv[]) {
+    printf("Command history:\n");
+    
+    if (history_count == 0) {
+        printf("  (empty)\n");
+        return 0;
+    }
+    
+    int start = (history_count < HISTORY_SIZE) ? 0 : (history_count % HISTORY_SIZE);
+    int count = (history_count < HISTORY_SIZE) ? history_count : HISTORY_SIZE;
+    
+    for (int i = 0; i < count; i++) {
+        int idx = (start + i) % HISTORY_SIZE;
+        printf("  %3d: %s\n", i + 1, command_history[idx]);
+    }
+    
     return 0;
 }
 
