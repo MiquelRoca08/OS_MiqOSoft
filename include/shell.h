@@ -6,6 +6,15 @@
 #define SHELL_BUFFER_SIZE 256
 #define SHELL_MAX_ARGS 16
 #define SHELL_PROMPT "miqos> "
+#define SHELL_MAX_SCROLL_BUFFER 1000  // Líneas máximas en el buffer de scroll
+
+// Estructura para el buffer de scroll
+typedef struct {
+    char lines[SHELL_MAX_SCROLL_BUFFER][81];  // 80 chars + \0
+    int line_count;
+    int current_top;  // Línea superior actualmente visible
+    bool scroll_mode;  // Si estamos en modo scroll
+} ScrollBuffer;
 
 // Estructura para el sistema de archivos virtual
 typedef struct {
@@ -38,7 +47,15 @@ void keyboard_set_shell_mode(bool enabled);
 void shell_init(void);
 void shell_run(void);
 void shell_process_command(const char* input);
-char* shell_get_current_line(void);  // Nueva función
+char* shell_get_current_line(void);
+
+// Funciones de scroll
+void shell_scroll_up(int lines);
+void shell_scroll_down(int lines);
+void shell_add_to_scroll_buffer(const char* text);
+void shell_redraw_screen(void);
+void shell_exit_scroll_mode(void);
+void shell_handle_mouse_scroll(int8_t scroll_delta);
 
 // Utilidades
 void shell_print_prompt(void);
