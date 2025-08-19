@@ -357,7 +357,7 @@ int cmd_scroll_test(int argc, char* argv[]);
 
 // Tabla de comandos disponibles
 static ShellCommand shell_commands[] = {
-    {"help",      "Show available commands",                    cmd_help},
+    {"help",      "Show available commands",                   cmd_help},
     {"clear",     "Clear the screen",                          cmd_clear},
     {"echo",      "Display a line of text",                    cmd_echo},
     {"version",   "Show OS version information",               cmd_version},
@@ -372,7 +372,7 @@ static ShellCommand shell_commands[] = {
     {"cat",       "Display file contents",                     cmd_cat},
     {"mkdir",     "Create directory",                          cmd_mkdir},
     {"rm",        "Remove file or directory",                  cmd_rm},
-    {"find",      "Find files by name pattern",               cmd_find},
+    {"find",      "Find files by name pattern",                cmd_find},
     {"grep",      "Search text in files",                      cmd_grep},
     {"wc",        "Count lines, words and characters",         cmd_wc},
     
@@ -391,7 +391,7 @@ static ShellCommand shell_commands[] = {
     {"hexdump",   "Display memory in hexadecimal",             cmd_hexdump},
     {"keytest",   "Test keyboard input (shows scancodes)",     cmd_keytest},
     {"benchmark", "Run CPU benchmark",                         cmd_benchmark},
-    {"registers", "Show CPU register values",                 cmd_registers},
+    {"registers", "Show CPU register values",                  cmd_registers},
     {"stack",     "Show stack contents",                       cmd_stack},
     
     // Scroll testing commands
@@ -400,7 +400,7 @@ static ShellCommand shell_commands[] = {
     
     // Red (no implementado)
     {"ping",      "Send ICMP echo requests",                   cmd_ping},
-    {"netstat",   "Show network statistics",                  cmd_netstat},
+    {"netstat",   "Show network statistics",                   cmd_netstat},
     
     {NULL, NULL, NULL} // Terminador
 };
