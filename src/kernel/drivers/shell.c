@@ -737,7 +737,7 @@ int cmd_echo(int argc, char* argv[]) {
 
 int cmd_version(int argc, char* argv[]) {
     char msg[256];
-    snprintf(msg, sizeof(msg), "MiqOSoft Kernel v0.16.1\n");
+    snprintf(msg, sizeof(msg), "MiqOSoft Kernel v0.17.2\n");
     printf("%s", msg);
     shell_add_to_scroll_buffer(msg);
     
