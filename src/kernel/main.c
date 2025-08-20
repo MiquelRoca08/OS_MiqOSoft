@@ -5,9 +5,8 @@
 #include <irq.h>
 #include <io.h>
 #include <debug.h>
-#include "../libs/boot/bootparams.h"
+#include <boot/bootparams.h>
 #include <keyboard.h>
-#include <mouse.h>
 #include <vga_text.h>
 #include "shell.h"
 
@@ -28,10 +27,7 @@ void start(BootParams* bootParams)
     HAL_Initialize();
 
     keyboard_init();
-    mouse_init(); // Inicializar el ratón
-    
     i686_IRQ_RegisterHandler(1, keyboard_handler);  // IRQ 1 = teclado
-    i686_IRQ_RegisterHandler(12, mouse_handler);    // IRQ 12 = ratón
     i686_EnableInterrupts();
     
     log_debug("Main", "Boot device: %x", bootParams->BootDevice);
@@ -51,13 +47,6 @@ void start(BootParams* bootParams)
     
     printf("OS MiqOSoft v0.17.3\n");
     printf("This operating system is under construction.\n\n");
-    
-    // Mostrar información sobre el ratón
-    if (mouse_has_wheel()) {
-        printf("Mouse with wheel detected - scroll support enabled!\n\n");
-    } else {
-        printf("Standard mouse detected.\n\n");
-    }
 
     // Inicializar la shell
     shell_init();
