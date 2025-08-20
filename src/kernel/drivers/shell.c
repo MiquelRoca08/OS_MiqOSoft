@@ -1,4 +1,5 @@
 #include "shell.h"
+#include <shell_commands.h>
 #include <stdio.h>
 #include <memory.h>
 #include <vga_text.h>
@@ -8,14 +9,22 @@
 #include <debug.h>
 #include <hal.h>
 #include <string.h>
-#include <stdio.h>
+#include <stdarg.h>
+#include <stddef.h>
 
 #define HISTORY_SIZE 50
 #define COMMAND_MAX_LEN 256
 
+// Definición de size_t si no está disponible
+#ifndef SIZE_T_DEFINED
+#define SIZE_T_DEFINED
+typedef unsigned long size_t;
+#endif
+
 // Buffer para la línea de comandos actual
 static char command_buffer[SHELL_BUFFER_SIZE];
 static int command_pos = 0;
+static int cursor_position = 0;  // Posición del cursor en la línea de comandos
 static bool shell_running = false;
 
 static char command_history[HISTORY_SIZE][COMMAND_MAX_LEN];
@@ -68,30 +77,38 @@ void shell_add_to_scroll_buffer(const char* text) {
 
 // Función para redibujar la pantalla desde el buffer de scroll
 void shell_redraw_screen(void) {
+    extern int g_ScreenX, g_ScreenY;
     VGA_clrscr();
     
     int lines_to_show = SCREEN_HEIGHT - 1; // Dejar una línea para el prompt
     int start_line = scroll_buffer.current_top;
     
+    // Guardar la posición actual del cursor
+    int saved_x = g_ScreenX;
+    int saved_y = g_ScreenY;
+    
     for (int i = 0; i < lines_to_show && (start_line + i) < scroll_buffer.line_count; i++) {
         printf("%s\n", scroll_buffer.lines[start_line + i]);
     }
     
-    // Si no estamos en modo scroll, mostrar el prompt
+    // Si no estamos en modo scroll, mostrar el prompt y el comando actual
     if (!scroll_buffer.scroll_mode) {
         shell_print_prompt();
         printf("%s", command_buffer);
+        // Restaurar la posición del cursor
+        g_ScreenX = shell_strlen(SHELL_PROMPT) + cursor_position;
+        g_ScreenY = SCREEN_HEIGHT - 1;
     } else {
         // En modo scroll, mostrar indicador
-        extern int g_ScreenX, g_ScreenY;
         g_ScreenY = SCREEN_HEIGHT - 1;
         g_ScreenX = 0;
-        VGA_setcursor(g_ScreenX, g_ScreenY);
         printf("-- SCROLL MODE -- (ESC to exit) Lines: %d-%d of %d", 
                scroll_buffer.current_top + 1, 
                scroll_buffer.current_top + lines_to_show, 
                scroll_buffer.line_count);
     }
+    
+    VGA_setcursor(g_ScreenX, g_ScreenY);
 }
 
 // Función para hacer scroll hacia arriba
@@ -100,8 +117,8 @@ void shell_scroll_up(int lines) {
     
     if (!scroll_buffer.scroll_mode) {
         scroll_buffer.scroll_mode = true;
-        // Capturar el estado actual del comando
-        // (ya está en command_buffer)
+        // Guardar el estado actual del comando y cursor
+        cursor_position = command_pos;
     }
     
     scroll_buffer.current_top -= lines;
@@ -141,6 +158,13 @@ void shell_exit_scroll_mode(void) {
     } else {
         scroll_buffer.current_top = 0;
     }
+    
+    // Restaurar el cursor y el estado del teclado
+    extern int g_ScreenX, g_ScreenY;
+    int prompt_len = shell_strlen(SHELL_PROMPT);
+    g_ScreenX = prompt_len + cursor_position;
+    g_ScreenY = SCREEN_HEIGHT - 1;
+    VGA_setcursor(g_ScreenX, g_ScreenY);
     
     shell_redraw_screen();
 }
@@ -251,9 +275,6 @@ void shell_display_command(const char* cmd) {
     // Mostrar el comando
     printf("%s", command_buffer);
 }
-
-// Cursor position within the command line (for LEFT/RIGHT arrows)
-static int cursor_position = 0;
 
 void shell_move_cursor_left(void) {
     if (cursor_position > 0) {
@@ -481,8 +502,13 @@ void shell_run(void) {
     while (keyboard_buffer_pop(&c)) {
         // Si estamos en modo scroll, manejar teclas especiales
         if (scroll_buffer.scroll_mode) {
-            if (c == 0x01) {  // ESC (usando código UP como ESC por simplicidad)
+            if (c == 0x1B) {  // ESC
                 shell_exit_scroll_mode();
+                extern int g_ScreenX, g_ScreenY;
+                g_ScreenX = shell_strlen(SHELL_PROMPT) + cursor_position;
+                g_ScreenY = SCREEN_HEIGHT - 1;
+                VGA_setcursor(g_ScreenX, g_ScreenY);
+                printf("%s", command_buffer); // Redibujamos el comando actual
                 continue;
             }
             // En modo scroll, ignorar otras teclas
@@ -675,28 +701,52 @@ void shell_process_command(const char* input) {
 
 int cmd_help(int argc, char* argv[]) {
     printf("Available commands:\n\n");
-    shell_add_to_scroll_buffer("Available commands:\n\n");
+    shell_add_to_scroll_buffer("Available commands:");
+    shell_add_to_scroll_buffer("");
     
     for (int i = 0; shell_commands[i].name != 0; i++) {
-        char line[256];
-        snprintf(line, sizeof(line), "  %-12s - %s\n", 
-               shell_commands[i].name, 
-               shell_commands[i].description);
-        printf("%s", line);
-        shell_add_to_scroll_buffer(line);
+        char formatted_line[256];
+        int pos = 0;
+        
+        // Añadir espacios iniciales
+        formatted_line[pos++] = ' ';
+        formatted_line[pos++] = ' ';
+        
+        // Copiar el nombre del comando
+        const char* name = shell_commands[i].name;
+        int name_len = shell_strlen(name);
+        shell_strncpy(formatted_line + pos, name, name_len);
+        pos += name_len;
+        
+        // Rellenar con espacios hasta la columna 14
+        while (pos < 14) {
+            formatted_line[pos++] = ' ';
+        }
+        
+        // Añadir el separador
+        formatted_line[pos++] = '-';
+        formatted_line[pos++] = ' ';
+        
+        // Añadir la descripción
+        shell_strncpy(formatted_line + pos, shell_commands[i].description, 256 - pos - 1);
+        formatted_line[255] = '\0';  // Asegurar que termina en null
+        
+        printf("%s\n", formatted_line);
+        shell_add_to_scroll_buffer(formatted_line);
     }
+    
     printf("\n");
-    shell_add_to_scroll_buffer("\n");
+    shell_add_to_scroll_buffer("");
     return 0;
 }
 
 int cmd_history(int argc, char* argv[]) {
     printf("Command history:\n");
-    shell_add_to_scroll_buffer("Command history:\n");
+    shell_add_to_scroll_buffer("Command history:");
     
     if (history_count == 0) {
         printf("  (empty)\n");
-        shell_add_to_scroll_buffer("  (empty)\n");
+        shell_add_to_scroll_buffer("  (empty)");
         return 0;
     }
     
@@ -705,9 +755,15 @@ int cmd_history(int argc, char* argv[]) {
     
     for (int i = 0; i < count; i++) {
         int idx = (start + i) % HISTORY_SIZE;
+        printf("  %3d: %s\n", i + 1, command_history[idx]);
+        
         char line[256];
-        snprintf(line, sizeof(line), "  %3d: %s\n", i + 1, command_history[idx]);
-        printf("%s", line);
+        char num_str[12];
+        format_number(num_str, i + 1);
+        shell_strncpy(line, "  ", 256);
+        shell_strncpy(line + 2, num_str, 256 - 2);
+        shell_strncpy(line + 2 + shell_strlen(num_str), ": ", 256 - 2 - shell_strlen(num_str));
+        shell_strncpy(line + 2 + shell_strlen(num_str) + 2, command_history[idx], 256 - 2 - shell_strlen(num_str) - 2);
         shell_add_to_scroll_buffer(line);
     }
     
@@ -717,7 +773,12 @@ int cmd_history(int argc, char* argv[]) {
 int cmd_clear(int argc, char* argv[]) {
     VGA_clrscr();
     // Limpiar también el buffer de scroll
-    memset(&scroll_buffer, 0, sizeof(scroll_buffer));
+    scroll_buffer.line_count = 0;
+    scroll_buffer.current_top = 0;
+    scroll_buffer.scroll_mode = false;
+    for (int i = 0; i < SHELL_MAX_SCROLL_BUFFER; i++) {
+        memset(scroll_buffer.lines[i], 0, 81);
+    }
     return 0;
 }
 
@@ -727,36 +788,28 @@ int cmd_echo(int argc, char* argv[]) {
         shell_add_to_scroll_buffer(argv[i]);
         if (i < argc - 1) {
             printf(" ");
-            shell_add_to_scroll_buffer(" ");
         }
     }
     printf("\n");
-    shell_add_to_scroll_buffer("\n");
     return 0;
 }
 
 int cmd_version(int argc, char* argv[]) {
-    char msg[256];
-    snprintf(msg, sizeof(msg), "MiqOSoft Kernel v0.17.2\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("MiqOSoft Kernel v0.17.3\n");
+    shell_add_to_scroll_buffer("MiqOSoft Kernel v0.17.3");
     
-    snprintf(msg, sizeof(msg), "Architecture: i686 (32-bit)\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Architecture: i686 (32-bit)\n");
+    shell_add_to_scroll_buffer("Architecture: i686 (32-bit)");
     
-    snprintf(msg, sizeof(msg), "Built with: GCC cross-compiler\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Built with: GCC cross-compiler\n");
+    shell_add_to_scroll_buffer("Built with: GCC cross-compiler");
     
-    snprintf(msg, sizeof(msg), "Shell: MiqOSoft Shell v1.0\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Shell: MiqOSoft Shell v1.0\n");
+    shell_add_to_scroll_buffer("Shell: MiqOSoft Shell v1.0");
     
     if (mouse_has_wheel()) {
-        snprintf(msg, sizeof(msg), "Mouse: IntelliMouse with wheel support\n");
-        printf("%s", msg);
-        shell_add_to_scroll_buffer(msg);
+        printf("Mouse: IntelliMouse with wheel support\n");
+        shell_add_to_scroll_buffer("Mouse: IntelliMouse with wheel support");
     }
     
     return 0;
@@ -764,7 +817,7 @@ int cmd_version(int argc, char* argv[]) {
 
 int cmd_reboot(int argc, char* argv[]) {
     printf("Rebooting system...\n");
-    shell_add_to_scroll_buffer("Rebooting system...\n");
+    shell_add_to_scroll_buffer("Rebooting system...");
     // Usar el puerto del teclado para reboot
     i686_outb(0x64, 0xFE);
     return 0;
@@ -772,79 +825,72 @@ int cmd_reboot(int argc, char* argv[]) {
 
 int cmd_panic(int argc, char* argv[]) {
     printf("Triggering kernel panic for testing purposes...\n");
-    shell_add_to_scroll_buffer("Triggering kernel panic for testing purposes...\n");
+    shell_add_to_scroll_buffer("Triggering kernel panic for testing purposes...");
     i686_Panic();
     return 0;
 }
 
 int cmd_memory(int argc, char* argv[]) {
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Memory Information:\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Memory Information:\n");
+    shell_add_to_scroll_buffer("Memory Information:");
     
-    snprintf(msg, sizeof(msg), "  Physical Memory: Not implemented yet\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Physical Memory: Not implemented yet\n");
+    shell_add_to_scroll_buffer("  Physical Memory: Not implemented yet");
     
-    snprintf(msg, sizeof(msg), "  Available Memory: Not implemented yet\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Available Memory: Not implemented yet\n");
+    shell_add_to_scroll_buffer("  Available Memory: Not implemented yet");
     
-    snprintf(msg, sizeof(msg), "  Kernel Memory: Not implemented yet\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Kernel Memory: Not implemented yet\n");
+    shell_add_to_scroll_buffer("  Kernel Memory: Not implemented yet");
     
-    snprintf(msg, sizeof(msg), "  User Memory: Not implemented yet\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  User Memory: Not implemented yet\n");
+    shell_add_to_scroll_buffer("  User Memory: Not implemented yet");
     
     // Mostrar información del buffer de scroll
-    snprintf(msg, sizeof(msg), "  Scroll Buffer: %d lines used of %d maximum\n", 
-             scroll_buffer.line_count, SHELL_MAX_SCROLL_BUFFER);
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Scroll Buffer: ");
+    char num_str[12];
+    format_number(num_str, scroll_buffer.line_count);
+    printf("%s", num_str);
+    printf(" lines used of ");
+    format_number(num_str, SHELL_MAX_SCROLL_BUFFER);
+    printf("%s", num_str);
+    printf(" maximum\n");
+    shell_add_to_scroll_buffer("  Scroll Buffer: lines used");
     
     return 0;
 }
 
 int cmd_uptime(int argc, char* argv[]) {
     printf("Uptime: Not implemented yet\n");
-    shell_add_to_scroll_buffer("Uptime: Not implemented yet\n");
+    shell_add_to_scroll_buffer("Uptime: Not implemented yet");
     printf("(Timer functionality needs to be added)\n");
-    shell_add_to_scroll_buffer("(Timer functionality needs to be added)\n");
+    shell_add_to_scroll_buffer("(Timer functionality needs to be added)");
     return 0;
 }
 
 int cmd_lspci(int argc, char* argv[]) {
     printf("PCI device enumeration not implemented yet.\n");
-    shell_add_to_scroll_buffer("PCI device enumeration not implemented yet.\n");
+    shell_add_to_scroll_buffer("PCI device enumeration not implemented yet.");
     printf("This would show connected PCI devices.\n");
-    shell_add_to_scroll_buffer("This would show connected PCI devices.\n");
+    shell_add_to_scroll_buffer("This would show connected PCI devices.");
     return 0;
 }
 
 int cmd_cpuinfo(int argc, char* argv[]) {
-    char msg[256];
-    snprintf(msg, sizeof(msg), "CPU Information:\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("CPU Information:\n");
+    shell_add_to_scroll_buffer("CPU Information:");
     
-    snprintf(msg, sizeof(msg), "  Architecture: i686 (32-bit x86)\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Architecture: i686 (32-bit x86)\n");
+    shell_add_to_scroll_buffer("  Architecture: i686 (32-bit x86)");
     
-    snprintf(msg, sizeof(msg), "  Vendor: (Detection not implemented)\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Vendor: (Detection not implemented)\n");
+    shell_add_to_scroll_buffer("  Vendor: (Detection not implemented)");
     
-    snprintf(msg, sizeof(msg), "  Model: (Detection not implemented)\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Model: (Detection not implemented)\n");
+    shell_add_to_scroll_buffer("  Model: (Detection not implemented)");
     
-    snprintf(msg, sizeof(msg), "  Features: (Detection not implemented)\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Features: (Detection not implemented)\n");
+    shell_add_to_scroll_buffer("  Features: (Detection not implemented)");
     
     return 0;
 }
@@ -869,17 +915,22 @@ VirtualFile virtual_fs[] = {
 
 int cmd_ls(int argc, char* argv[]) {
     printf("Directory listing:\n");
-    shell_add_to_scroll_buffer("Directory listing:\n");
+    shell_add_to_scroll_buffer("Directory listing:");
     
     for (int i = 0; virtual_fs[i].exists; i++) {
-        char line[256];
         if (virtual_fs[i].is_directory) {
-            snprintf(line, sizeof(line), "  [DIR]  %s\n", virtual_fs[i].name);
+            printf("  [DIR]  %s\n", virtual_fs[i].name);
+            char line[256];
+            shell_strncpy(line, "  [DIR]  ", 256);
+            shell_strncpy(line + 9, virtual_fs[i].name, 256 - 9);
+            shell_add_to_scroll_buffer(line);
         } else {
-            snprintf(line, sizeof(line), "  [FILE] %s\n", virtual_fs[i].name);
+            printf("  [FILE] %s\n", virtual_fs[i].name);
+            char line[256];
+            shell_strncpy(line, "  [FILE] ", 256);
+            shell_strncpy(line + 9, virtual_fs[i].name, 256 - 9);
+            shell_add_to_scroll_buffer(line);
         }
-        printf("%s", line);
-        shell_add_to_scroll_buffer(line);
     }
     return 0;
 }
@@ -887,7 +938,7 @@ int cmd_ls(int argc, char* argv[]) {
 int cmd_cat(int argc, char* argv[]) {
     if (argc < 2) {
         printf("Usage: cat <filename>\n");
-        shell_add_to_scroll_buffer("Usage: cat <filename>\n");
+        shell_add_to_scroll_buffer("Usage: cat <filename>");
         return 1;
     }
     
@@ -896,14 +947,15 @@ int cmd_cat(int argc, char* argv[]) {
             shell_strcmp(virtual_fs[i].name, argv[1]) == 0) {
             printf("%s\n", virtual_fs[i].content);
             shell_add_to_scroll_buffer(virtual_fs[i].content);
-            shell_add_to_scroll_buffer("\n");
             return 0;
         }
     }
     
+    printf("cat: %s: No such file\n", argv[1]);
     char error_msg[256];
-    snprintf(error_msg, sizeof(error_msg), "cat: %s: No such file\n", argv[1]);
-    printf("%s", error_msg);
+    shell_strncpy(error_msg, "cat: ", 256);
+    shell_strncpy(error_msg + 5, argv[1], 256 - 5);
+    shell_strncpy(error_msg + 5 + shell_strlen(argv[1]), ": No such file", 256 - 5 - shell_strlen(argv[1]));
     shell_add_to_scroll_buffer(error_msg);
     return 1;
 }
@@ -911,17 +963,17 @@ int cmd_cat(int argc, char* argv[]) {
 int cmd_mkdir(int argc, char* argv[]) {
     if (argc < 2) {
         printf("Usage: mkdir <directory>\n");
-        shell_add_to_scroll_buffer("Usage: mkdir <directory>\n");
+        shell_add_to_scroll_buffer("Usage: mkdir <directory>");
         return 1;
     }
     
-    char msg[256];
-    snprintf(msg, sizeof(msg), "mkdir: Directory creation not fully implemented\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("mkdir: Directory creation not fully implemented\n");
+    shell_add_to_scroll_buffer("mkdir: Directory creation not fully implemented");
     
-    snprintf(msg, sizeof(msg), "Would create directory: %s\n", argv[1]);
-    printf("%s", msg);
+    printf("Would create directory: %s\n", argv[1]);
+    char msg[256];
+    shell_strncpy(msg, "Would create directory: ", 256);
+    shell_strncpy(msg + 24, argv[1], 256 - 24);
     shell_add_to_scroll_buffer(msg);
     return 0;
 }
@@ -929,17 +981,17 @@ int cmd_mkdir(int argc, char* argv[]) {
 int cmd_rm(int argc, char* argv[]) {
     if (argc < 2) {
         printf("Usage: rm <file>\n");
-        shell_add_to_scroll_buffer("Usage: rm <file>\n");
+        shell_add_to_scroll_buffer("Usage: rm <file>");
         return 1;
     }
     
-    char msg[256];
-    snprintf(msg, sizeof(msg), "rm: File deletion not fully implemented\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("rm: File deletion not fully implemented\n");
+    shell_add_to_scroll_buffer("rm: File deletion not fully implemented");
     
-    snprintf(msg, sizeof(msg), "Would remove: %s\n", argv[1]);
-    printf("%s", msg);
+    printf("Would remove: %s\n", argv[1]);
+    char msg[256];
+    shell_strncpy(msg, "Would remove: ", 256);
+    shell_strncpy(msg + 14, argv[1], 256 - 14);
     shell_add_to_scroll_buffer(msg);
     return 0;
 }
@@ -950,19 +1002,19 @@ int cmd_rm(int argc, char* argv[]) {
 
 int cmd_lsmod(int argc, char* argv[]) {
     printf("Loaded kernel modules:\n");
-    shell_add_to_scroll_buffer("Loaded kernel modules:\n");
+    shell_add_to_scroll_buffer("Loaded kernel modules:");
     
-    char modules[][256] = {
-        "  core         - Core kernel functionality\n",
-        "  hal          - Hardware Abstraction Layer\n",
-        "  vga_text     - VGA text mode driver\n",
-        "  keyboard     - PS/2 keyboard driver\n",
-        "  mouse        - PS/2 mouse driver\n",
-        "  i8259        - PIC interrupt controller\n"
+    char* modules[] = {
+        "  core         - Core kernel functionality",
+        "  hal          - Hardware Abstraction Layer",
+        "  vga_text     - VGA text mode driver",
+        "  keyboard     - PS/2 keyboard driver",
+        "  mouse        - PS/2 mouse driver",
+        "  i8259        - PIC interrupt controller"
     };
     
     for (int i = 0; i < 6; i++) {
-        printf("%s", modules[i]);
+        printf("%s\n", modules[i]);
         shell_add_to_scroll_buffer(modules[i]);
     }
     
@@ -971,21 +1023,21 @@ int cmd_lsmod(int argc, char* argv[]) {
 
 int cmd_dmesg(int argc, char* argv[]) {
     printf("Kernel messages (last few):\n");
-    shell_add_to_scroll_buffer("Kernel messages (last few):\n");
+    shell_add_to_scroll_buffer("Kernel messages (last few):");
     
-    char messages[][256] = {
-        "[0.000] Kernel started\n",
-        "[0.001] GDT initialized\n",
-        "[0.002] IDT initialized\n",
-        "[0.003] ISR handlers installed\n",
-        "[0.004] IRQ handlers installed\n",
-        "[0.005] Keyboard driver loaded\n",
-        "[0.006] Mouse driver loaded\n",
-        "[0.007] Shell initialized\n"
+    char* messages[] = {
+        "[0.000] Kernel started",
+        "[0.001] GDT initialized",
+        "[0.002] IDT initialized",
+        "[0.003] ISR handlers installed",
+        "[0.004] IRQ handlers installed",
+        "[0.005] Keyboard driver loaded",
+        "[0.006] Mouse driver loaded",
+        "[0.007] Shell initialized"
     };
     
     for (int i = 0; i < 8; i++) {
-        printf("%s", messages[i]);
+        printf("%s\n", messages[i]);
         shell_add_to_scroll_buffer(messages[i]);
     }
     
@@ -994,17 +1046,18 @@ int cmd_dmesg(int argc, char* argv[]) {
 
 int cmd_ps(int argc, char* argv[]) {
     printf("Running processes:\n");
-    shell_add_to_scroll_buffer("Running processes:\n");
+    shell_add_to_scroll_buffer("Running processes:");
     
-    char processes[][256] = {
-        "  PID  PPID  STATE    NAME\n",
-        "    0     -  running  kernel\n",
-        "    1     0  running  shell\n",
-        "\nNote: Process management not fully implemented\n"
+    char* processes[] = {
+        "  PID  PPID  STATE    NAME",
+        "    0     -  running  kernel",
+        "    1     0  running  shell",
+        "",
+        "Note: Process management not fully implemented"
     };
     
-    for (int i = 0; i < 4; i++) {
-        printf("%s", processes[i]);
+    for (int i = 0; i < 5; i++) {
+        printf("%s\n", processes[i]);
         shell_add_to_scroll_buffer(processes[i]);
     }
     
@@ -1013,42 +1066,42 @@ int cmd_ps(int argc, char* argv[]) {
 
 // Comando para mostrar información del scroll
 int cmd_scroll_info(int argc, char* argv[]) {
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Scroll Buffer Information:\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Scroll Buffer Information:\n");
+    shell_add_to_scroll_buffer("Scroll Buffer Information:");
     
-    snprintf(msg, sizeof(msg), "  Total lines: %d\n", scroll_buffer.line_count);
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Total lines: ");
+    char num_str[12];
+    format_number(num_str, scroll_buffer.line_count);
+    printf("%s\n", num_str);
+    shell_add_to_scroll_buffer("  Total lines: stored");
     
-    snprintf(msg, sizeof(msg), "  Current top: %d\n", scroll_buffer.current_top);
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Current top: ");
+    format_number(num_str, scroll_buffer.current_top);
+    printf("%s\n", num_str);
+    shell_add_to_scroll_buffer("  Current top: position");
     
-    snprintf(msg, sizeof(msg), "  Scroll mode: %s\n", scroll_buffer.scroll_mode ? "ON" : "OFF");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Scroll mode: %s\n", scroll_buffer.scroll_mode ? "ON" : "OFF");
+    shell_add_to_scroll_buffer(scroll_buffer.scroll_mode ? "  Scroll mode: ON" : "  Scroll mode: OFF");
     
-    snprintf(msg, sizeof(msg), "  Max buffer size: %d lines\n", SHELL_MAX_SCROLL_BUFFER);
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("  Max buffer size: ");
+    format_number(num_str, SHELL_MAX_SCROLL_BUFFER);
+    printf("%s lines\n", num_str);
+    shell_add_to_scroll_buffer("  Max buffer size: lines");
     
     if (mouse_has_wheel()) {
-        snprintf(msg, sizeof(msg), "  Mouse wheel: Available\n");
+        printf("  Mouse wheel: Available\n");
+        shell_add_to_scroll_buffer("  Mouse wheel: Available");
     } else {
-        snprintf(msg, sizeof(msg), "  Mouse wheel: Not available\n");
+        printf("  Mouse wheel: Not available\n");
+        shell_add_to_scroll_buffer("  Mouse wheel: Not available");
     }
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
     
-    snprintf(msg, sizeof(msg), "\nUse mouse wheel to scroll up/down through history.\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("\nUse mouse wheel to scroll up/down through history.\n");
+    shell_add_to_scroll_buffer("");
+    shell_add_to_scroll_buffer("Use mouse wheel to scroll up/down through history.");
     
-    snprintf(msg, sizeof(msg), "Press ESC to exit scroll mode.\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Press ESC to exit scroll mode.\n");
+    shell_add_to_scroll_buffer("Press ESC to exit scroll mode.");
     
     return 0;
 }
@@ -1068,190 +1121,32 @@ int cmd_scroll_test(int argc, char* argv[]) {
         if (lines <= 0 || lines > 100) lines = 30;
     }
     
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Generating %d test lines for scroll testing:\n", lines);
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("Generating ");
+    char num_str[12];
+    format_number(num_str, lines);
+    printf("%s test lines for scroll testing:\n", num_str);
+    shell_add_to_scroll_buffer("Generating test lines for scroll testing:");
     
     for (int i = 1; i <= lines; i++) {
-        snprintf(msg, sizeof(msg), "Line %03d: This is a test line for scroll functionality - Lorem ipsum dolor sit amet\n", i);
-        printf("%s", msg);
-        shell_add_to_scroll_buffer(msg);
+        printf("Line ");
+        format_number(num_str, i);
+        if (i < 10) printf("00%s", num_str);
+        else if (i < 100) printf("0%s", num_str);
+        else printf("%s", num_str);
+        printf(": This is a test line for scroll functionality - Lorem ipsum\n");
+        
+        char line[256];
+        shell_strncpy(line, "Line ", 256);
+        shell_strncpy(line + 5, num_str, 256 - 5);
+        shell_strncpy(line + 5 + shell_strlen(num_str), ": This is a test line for scroll functionality", 256 - 5 - shell_strlen(num_str));
+        shell_add_to_scroll_buffer(line);
     }
     
-    snprintf(msg, sizeof(msg), "\nTest completed. Use mouse wheel to scroll through the output.\n");
-    printf("%s", msg);
-    shell_add_to_scroll_buffer(msg);
+    printf("\nTest completed. Use mouse wheel to scroll through the output.\n");
+    shell_add_to_scroll_buffer("");
+    shell_add_to_scroll_buffer("Test completed. Use mouse wheel to scroll through the output.");
     
     return 0;
 }
 
-// Función auxiliar para snprintf (implementación simple)
-int snprintf(char* buffer, size_t size, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    
-    // Implementación muy básica - solo soporta %s, %d, %x
-    int written = 0;
-    const char* fmt = format;
-    
-    while (*fmt && written < size - 1) {
-        if (*fmt == '%') {
-            fmt++;
-            switch (*fmt) {
-                case 's': {
-                    char* str = va_arg(args, char*);
-                    while (*str && written < size - 1) {
-                        buffer[written++] = *str++;
-                    }
-                    break;
-                }
-                case 'd': {
-                    int num = va_arg(args, int);
-                    if (num == 0) {
-                        buffer[written++] = '0';
-                    } else {
-                        char temp[12];
-                        int temp_len = 0;
-                        bool negative = num < 0;
-                        if (negative) num = -num;
-                        
-                        while (num > 0) {
-                            temp[temp_len++] = '0' + (num % 10);
-                            num /= 10;
-                        }
-                        
-                        if (negative && written < size - 1) {
-                            buffer[written++] = '-';
-                        }
-                        
-                        for (int i = temp_len - 1; i >= 0 && written < size - 1; i--) {
-                            buffer[written++] = temp[i];
-                        }
-                    }
-                    break;
-                }
-                case 'x': {
-                    uint32_t num = va_arg(args, uint32_t);
-                    char hex_chars[] = "0123456789abcdef";
-                    char temp[9];
-                    int temp_len = 0;
-                    
-                    if (num == 0) {
-                        buffer[written++] = '0';
-                    } else {
-                        while (num > 0) {
-                            temp[temp_len++] = hex_chars[num % 16];
-                            num /= 16;
-                        }
-                        
-                        for (int i = temp_len - 1; i >= 0 && written < size - 1; i--) {
-                            buffer[written++] = temp[i];
-                        }
-                    }
-                    break;
-                }
-                case '%':
-                    buffer[written++] = '%';
-                    break;
-            }
-        } else {
-            buffer[written++] = *fmt;
-        }
-        fmt++;
-    }
-    
-    buffer[written] = '\0';
-    va_end(args);
-    return written;
-}
-
-// Función auxiliar para vsnprintf
-int vsnprintf(char* buffer, size_t size, const char* format, va_list args) {
-    int written = 0;
-    const char* fmt = format;
-    
-    while (*fmt && written < size - 1) {
-        if (*fmt == '%') {
-            fmt++;
-            switch (*fmt) {
-                case 's': {
-                    char* str = va_arg(args, char*);
-                    while (*str && written < size - 1) {
-                        buffer[written++] = *str++;
-                    }
-                    break;
-                }
-                case 'd': {
-                    int num = va_arg(args, int);
-                    if (num == 0) {
-                        buffer[written++] = '0';
-                    } else {
-                        char temp[12];
-                        int temp_len = 0;
-                        bool negative = num < 0;
-                        if (negative) num = -num;
-                        
-                        while (num > 0) {
-                            temp[temp_len++] = '0' + (num % 10);
-                            num /= 10;
-                        }
-                        
-                        if (negative && written < size - 1) {
-                            buffer[written++] = '-';
-                        }
-                        
-                        for (int i = temp_len - 1; i >= 0 && written < size - 1; i--) {
-                            buffer[written++] = temp[i];
-                        }
-                    }
-                    break;
-                }
-                case 'x': {
-                    uint32_t num = va_arg(args, uint32_t);
-                    char hex_chars[] = "0123456789abcdef";
-                    char temp[9];
-                    int temp_len = 0;
-                    
-                    if (num == 0) {
-                        buffer[written++] = '0';
-                    } else {
-                        while (num > 0) {
-                            temp[temp_len++] = hex_chars[num % 16];
-                            num /= 16;
-                        }
-                        
-                        for (int i = temp_len - 1; i >= 0 && written < size - 1; i--) {
-                            buffer[written++] = temp[i];
-                        }
-                    }
-                    break;
-                }
-                case '%':
-                    buffer[written++] = '%';
-                    break;
-            }
-        } else {
-            buffer[written++] = *fmt;
-        }
-        fmt++;
-    }
-    
-    buffer[written] = '\0';
-    return written;
-}
-
-// Función auxiliar para vprintf 
-int vprintf(const char* format, va_list args) {
-    // Esta es una implementación básica que redirige a printf
-    // En un sistema real, esto sería más complejo
-    char buffer[1024];
-    int result = vsnprintf(buffer, sizeof(buffer), format, args);
-    
-    // Imprimir carácter por carácter usando la función VGA
-    for (int i = 0; i < result && buffer[i]; i++) {
-        VGA_putc(buffer[i]);
-    }
-    
-    return result;
-}
+// Real command implementations are in shell_advanced.c

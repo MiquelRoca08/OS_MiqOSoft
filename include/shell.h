@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdarg.h>
+#include "shell_commands.h"
 
 #define SHELL_BUFFER_SIZE 256
 #define SHELL_MAX_ARGS 16
@@ -71,39 +74,39 @@ int cmd_reboot(int argc, char* argv[]);
 int cmd_panic(int argc, char* argv[]);
 int cmd_memory(int argc, char* argv[]);
 int cmd_uptime(int argc, char* argv[]);
-int cmd_lspci(int argc, char* argv[]);
-int cmd_cpuinfo(int argc, char* argv[]);
+int cmd_history(int argc, char* argv[]);
 
-// Sistema de archivos simulado (para demostración)
+// Sistema de archivos
 int cmd_ls(int argc, char* argv[]);
 int cmd_cat(int argc, char* argv[]);
 int cmd_mkdir(int argc, char* argv[]);
 int cmd_rm(int argc, char* argv[]);
+int cmd_find(int argc, char* argv[]);
+int cmd_grep(int argc, char* argv[]);
+int cmd_wc(int argc, char* argv[]);
 
-// Utilidades del kernel
+// Información del sistema
 int cmd_lsmod(int argc, char* argv[]);
 int cmd_dmesg(int argc, char* argv[]);
 int cmd_ps(int argc, char* argv[]);
-int cmd_history(int argc, char* argv[]);
+int cmd_lspci(int argc, char* argv[]);
+int cmd_cpuinfo(int argc, char* argv[]);
+int cmd_cpuid(int argc, char* argv[]);
 
-// Comandos de sistema y hardware
+// Hardware y debugging
 int cmd_memtest(int argc, char* argv[]);
 int cmd_ports(int argc, char* argv[]);
 int cmd_interrupt(int argc, char* argv[]);
 int cmd_hexdump(int argc, char* argv[]);
 int cmd_keytest(int argc, char* argv[]);
 int cmd_benchmark(int argc, char* argv[]);
-
-// Comandos de debugging
 int cmd_registers(int argc, char* argv[]);
 int cmd_stack(int argc, char* argv[]);
-int cmd_cpuid(int argc, char* argv[]);
 
-// Comandos de red (stubs)
+// Scroll testing commands
+int cmd_scroll_info(int argc, char* argv[]);
+int cmd_scroll_test(int argc, char* argv[]);
+
+// Red (no implementado)
 int cmd_ping(int argc, char* argv[]);
 int cmd_netstat(int argc, char* argv[]);
-
-// Comandos avanzados de archivos
-int cmd_find(int argc, char* argv[]);
-int cmd_grep(int argc, char* argv[]);
-int cmd_wc(int argc, char* argv[]);

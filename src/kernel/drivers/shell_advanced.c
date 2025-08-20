@@ -1,4 +1,5 @@
 #include "shell.h"
+#include <shell_commands.h>
 #include <stdio.h>
 #include <io.h>
 #include <vga_text.h>

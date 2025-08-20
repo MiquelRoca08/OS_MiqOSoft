@@ -49,7 +49,7 @@ void start(BootParams* bootParams)
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
     
-    printf("OS MiqOSoft v0.17.2\n");
+    printf("OS MiqOSoft v0.17.3\n");
     printf("This operating system is under construction.\n\n");
     
     // Mostrar información sobre el ratón

@@ -13,7 +13,7 @@ static MousePacket current_packet;
 static bool packet_ready = false;
 
 // Callback para el scroll
-void (*mouse_scroll_callback)(int8_t scroll_delta) = NULL;
+void (*mouse_scroll_callback)(int8_t scroll_delta) = 0;
 
 // Función para esperar hasta que se pueda leer del ratón
 static bool mouse_wait_read(void) {
@@ -59,8 +59,6 @@ static uint8_t mouse_read(void) {
 
 // Detectar si el ratón tiene rueda
 static bool mouse_detect_wheel(void) {
-    log_info("MOUSE", "Detecting wheel support...");
-    
     // Secuencia para activar la rueda (IntelliMouse)
     // Set sample rate to 200
     mouse_write_mouse(MOUSE_CMD_SET_SAMPLE);
@@ -85,14 +83,11 @@ static bool mouse_detect_wheel(void) {
     if (mouse_read() != MOUSE_ACK) return false;
     
     uint8_t id = mouse_read();
-    log_info("MOUSE", "Device ID: 0x%02X", id);
     
     return (id == 0x03); // 0x03 = IntelliMouse (con rueda)
 }
 
 void mouse_init(void) {
-    log_info("MOUSE", "Initializing PS/2 mouse...");
-    
     // Habilitar el puerto auxiliar (ratón)
     mouse_write_controller(MOUSE_CMD_ENABLE_AUX);
     
@@ -104,7 +99,6 @@ void mouse_init(void) {
     // Reset del ratón
     mouse_write_mouse(MOUSE_CMD_RESET);
     if (mouse_read() != MOUSE_ACK) {
-        log_err("MOUSE", "Mouse reset failed");
         return;
     }
     
@@ -116,22 +110,19 @@ void mouse_init(void) {
     mouse_has_wheel_support = mouse_detect_wheel();
     if (mouse_has_wheel_support) {
         packet_size = 4;
-        log_info("MOUSE", "Wheel mouse detected (4-byte packets)");
     } else {
         packet_size = 3;
-        log_info("MOUSE", "Standard mouse detected (3-byte packets)");
     }
     
     // Configurar valores por defecto
     mouse_write_mouse(MOUSE_CMD_SET_DEFAULTS);
     if (mouse_read() != MOUSE_ACK) {
-        log_warn("MOUSE", "Set defaults failed");
+        // Continue anyway
     }
     
     // Habilitar el ratón
     mouse_write_mouse(MOUSE_CMD_ENABLE);
     if (mouse_read() != MOUSE_ACK) {
-        log_err("MOUSE", "Mouse enable failed");
         return;
     }
     
@@ -140,7 +131,7 @@ void mouse_init(void) {
     i686_outb(0xA1, i686_inb(0xA1) & ~(1 << 4)); // IRQ 12 en el PIC secundario
     
     mouse_initialized = true;
-    log_info("MOUSE", "Mouse initialized successfully");
+    printf("Mouse initialized successfully\n");
 }
 
 void mouse_handler(Registers* regs) {
@@ -198,15 +189,6 @@ void mouse_handler(Registers* regs) {
         }
         
         packet_ready = true;
-        
-        // Debug: mostrar información del ratón (descomenta para debug)
-        /*
-        if (current_packet.x_delta != 0 || current_packet.y_delta != 0 || current_packet.z_delta != 0) {
-            log_debug("MOUSE", "dx=%d dy=%d dz=%d L=%d R=%d M=%d", 
-                     current_packet.x_delta, current_packet.y_delta, current_packet.z_delta,
-                     current_packet.left_button, current_packet.right_button, current_packet.middle_button);
-        }
-        */
     }
 }
 
@@ -219,7 +201,7 @@ MousePacket* mouse_get_packet(void) {
         packet_ready = false;
         return &current_packet;
     }
-    return NULL;
+    return 0;
 }
 
 void mouse_set_scroll_callback(void (*callback)(int8_t scroll_delta)) {
