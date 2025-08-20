@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include "stdio.h"
-#include "memory.h"
+#include <stdio.h>
+#include <memory.h>
 #include <hal.h>
 #include <irq.h>
 #include <io.h>
@@ -8,7 +8,7 @@
 #include <boot/bootparams.h>
 #include <keyboard.h>
 #include <vga_text.h>
-#include "shell.h"
+#include <shell.h>
 
 extern void _init();
 
@@ -45,7 +45,7 @@ void start(BootParams* bootParams)
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
     
-    printf("OS MiqOSoft v0.17.3\n");
+    printf("OS MiqOSoft v0.17.5\n");
     printf("This operating system is under construction.\n\n");
 
     // Inicializar la shell

@@ -270,12 +270,11 @@ static ShellCommand shell_commands[] = {
     {"benchmark", "Run CPU benchmark",                         cmd_benchmark},
     {"registers", "Show CPU register values",                  cmd_registers},
     {"stack",     "Show stack contents",                       cmd_stack},
-    
-    // Red (no implementado)
     {"ping",      "Send ICMP echo requests",                   cmd_ping},
     {"netstat",   "Show network statistics",                   cmd_netstat},
+    {"exit",      "Exit the shell",                            NULL},  // Comando adicional para mejor organización
     
-    {NULL, NULL, NULL} // Terminador
+    {NULL, NULL, NULL}  // Terminador
 };
 
 void shell_init(void) {
@@ -508,20 +507,53 @@ void shell_process_command(const char* input) {
 int cmd_help(int argc, char* argv[]) {
     printf("=== MiqOSoft Shell Commands ===\n\n");
     
-    // Primero encontrar la longitud del comando más largo
+    // Primero encontrar la longitud del comando más largo y contar total de comandos
     int max_length = 0;
+    int total_commands = 0;
     for (int i = 0; shell_commands[i].name != 0; i++) {
         int len = shell_strlen(shell_commands[i].name);
         if (len > max_length) {
             max_length = len;
         }
+        total_commands++;
     }
     
     // Añadir margen para la alineación
     max_length += 4;
+
+    // Número de líneas por página (ajustar según el tamaño de la pantalla)
+    const int LINES_PER_PAGE = 15;
+    int current_page = 0;
+    int total_pages = (total_commands + LINES_PER_PAGE - 1) / LINES_PER_PAGE;
     
     // Mostrar cada comando con el espaciado correcto
     for (int i = 0; shell_commands[i].name != 0; i++) {
+        // Si es el inicio de una nueva página (excepto la primera)
+        if (i > 0 && (i % LINES_PER_PAGE) == 0) {
+            printf("\nPress any key to continue...");
+            
+            // Esperar una tecla
+            char c;
+            bool key_pressed = false;
+            while (!key_pressed) {
+                if (keyboard_buffer_pop(&c)) {
+                    key_pressed = true;
+                    if (c == 'q' || c == 'Q') {
+                        printf("\n");
+                        return 0;
+                    }
+                }
+            }
+            
+            // Limpiar línea y continuar
+            printf("\r                                           \r");
+            VGA_clrscr();  // Limpiar pantalla para la siguiente página
+            printf("=== MiqOSoft Shell Commands (Page %d/%d) ===\n\n", 
+                   current_page + 2, total_pages);
+            current_page++;
+        }
+
+        // Imprimir comando y descripción
         printf("%s", shell_commands[i].name);
         
         // Calcular y añadir espacios necesarios
@@ -533,6 +565,7 @@ int cmd_help(int argc, char* argv[]) {
         printf("%s\n", shell_commands[i].description);
     }
     
+    printf("\n");
     return 0;
 }
 
@@ -570,7 +603,7 @@ int cmd_echo(int argc, char* argv[]) {
 }
 
 int cmd_version(int argc, char* argv[]) {
-    printf("MiqOSoft Kernel v0.17.3\n");
+    printf("MiqOSoft Kernel v0.17.5\n");
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
