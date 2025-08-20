@@ -234,45 +234,55 @@ void format_number(char* buffer, int num) {
 
 // Tabla de comandos disponibles
 static ShellCommand shell_commands[] = {
-    {"help",      "Show available commands",                   cmd_help},
-    {"clear",     "Clear the screen",                          cmd_clear},
-    {"echo",      "Display a line of text",                    cmd_echo},
-    {"version",   "Show OS version information",               cmd_version},
-    {"reboot",    "Restart the system",                        cmd_reboot},
-    {"panic",     "Trigger a kernel panic (for testing)",      cmd_panic},
-    {"memory",    "Show memory information",                   cmd_memory},
-    {"uptime",    "Show system uptime",                        cmd_uptime},
-    {"history",   "Show command history",                      cmd_history},
+    {"help",            "Show available commands",                   cmd_help},
+    {"clear",           "Clear the screen",                          cmd_clear},
+    {"echo",            "Display a line of text",                    cmd_echo},
+    {"version",         "Show OS version information",               cmd_version},
+    {"reboot",          "Restart the system",                        cmd_reboot},
+    {"panic",           "Trigger a kernel panic (for testing)",      cmd_panic},
+    {"memory",          "Show memory information",                   cmd_memory},
+    {"uptime",          "Show system uptime",                        cmd_uptime},
+    {"history",         "Show command history",                      cmd_history},
     
     // Sistema de archivos
-    {"ls",        "List directory contents",                   cmd_ls},
-    {"cat",       "Display file contents",                     cmd_cat},
-    {"mkdir",     "Create directory",                          cmd_mkdir},
-    {"rm",        "Remove file or directory",                  cmd_rm},
-    {"find",      "Find files by name pattern",                cmd_find},
-    {"grep",      "Search text in files",                      cmd_grep},
-    {"wc",        "Count lines, words and characters",         cmd_wc},
+    {"ls",              "List directory contents",                   cmd_ls},
+    {"cat",             "Display file contents",                     cmd_cat},
+    {"mkdir",           "Create directory",                          cmd_mkdir},
+    {"rm",              "Remove file or directory",                  cmd_rm},
+    {"find",            "Find files by name pattern",                cmd_find},
+    {"grep",            "Search text in files",                      cmd_grep},
+    {"wc",              "Count lines, words and characters",         cmd_wc},
     
     // Información del sistema
-    {"lsmod",     "List loaded kernel modules",                cmd_lsmod},
-    {"dmesg",     "Show kernel messages",                      cmd_dmesg},
-    {"ps",        "Show running processes",                    cmd_ps},
-    {"lspci",     "List PCI devices",                          cmd_lspci},
-    {"cpuinfo",   "Show CPU information",                      cmd_cpuinfo},
-    {"cpuid",     "Show detailed CPU information via CPUID",   cmd_cpuid},
+    {"lsmod",           "List loaded kernel modules",                cmd_lsmod},
+    {"dmesg",           "Show kernel messages",                      cmd_dmesg},
+    {"ps",              "Show running processes",                    cmd_ps},
+    {"lspci",           "List PCI devices",                          cmd_lspci},
+    {"cpuinfo",         "Show CPU information",                      cmd_cpuinfo},
+    {"cpuid",           "Show detailed CPU information via CPUID",   cmd_cpuid},
     
     // Hardware y debugging
-    {"memtest",   "Run basic memory test",                     cmd_memtest},
-    {"ports",     "Read/write I/O ports",                      cmd_ports},
-    {"interrupt", "Control interrupt state",                   cmd_interrupt},
-    {"hexdump",   "Display memory in hexadecimal",             cmd_hexdump},
-    {"keytest",   "Test keyboard input (shows scancodes)",     cmd_keytest},
-    {"benchmark", "Run CPU benchmark",                         cmd_benchmark},
-    {"registers", "Show CPU register values",                  cmd_registers},
-    {"stack",     "Show stack contents",                       cmd_stack},
-    {"ping",      "Send ICMP echo requests",                   cmd_ping},
-    {"netstat",   "Show network statistics",                   cmd_netstat},
-    {"exit",      "Exit the shell",                            NULL},  // Comando adicional para mejor organización
+    {"memtest",         "Run basic memory test",                     cmd_memtest},
+    {"ports",           "Read/write I/O ports",                      cmd_ports},
+    {"interrupt",       "Control interrupt state",                   cmd_interrupt},
+    {"hexdump",         "Display memory in hexadecimal",             cmd_hexdump},
+    {"keytest",         "Test keyboard input (shows scancodes)",     cmd_keytest},
+    {"benchmark",       "Run CPU benchmark",                         cmd_benchmark},
+    {"registers",       "Show CPU register values",                  cmd_registers},
+    {"stack",           "Show stack contents",                       cmd_stack},
+    {"ping",            "Send ICMP echo requests",                   cmd_ping},
+    {"netstat",         "Show network statistics",                   cmd_netstat},
+
+    // Syscalls y pruebas
+    {"syscall_test",    "Test system call functionality",            cmd_syscall_test},
+    {"syscall_info",    "Show syscall information and usage",        cmd_syscall_info},
+    {"malloc_test",     "Test memory allocation via syscall",        cmd_malloc_test},
+    {"file_create",     "Create file via syscall",                   cmd_file_create},
+    {"file_read",       "Read file via syscall",                     cmd_file_read},
+    {"heap_info",       "Show heap information and test",            cmd_heap_info},
+    {"sleep_test",      "Test sleep syscall",                        cmd_sleep_test},
+
+    {"exit",            "Exit the shell",                            NULL},  // Comando adicional para mejor organización
     
     {NULL, NULL, NULL}  // Terminador
 };
@@ -603,7 +613,7 @@ int cmd_echo(int argc, char* argv[]) {
 }
 
 int cmd_version(int argc, char* argv[]) {
-    printf("MiqOSoft Kernel v0.17.5\n");
+    printf("MiqOSoft Kernel v0.18\n");
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");

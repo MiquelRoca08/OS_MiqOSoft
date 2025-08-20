@@ -5,7 +5,7 @@
 
 #define SHELL_BUFFER_SIZE 256
 #define SHELL_MAX_ARGS 16
-#define SHELL_PROMPT "miqos> "
+#define SHELL_PROMPT "MiqOs> "
 
 // Estructura para el sistema de archivos virtual
 typedef struct {
@@ -90,3 +90,12 @@ int cmd_netstat(int argc, char* argv[]);
 int cmd_find(int argc, char* argv[]);
 int cmd_grep(int argc, char* argv[]);
 int cmd_wc(int argc, char* argv[]);
+
+// Syscalls integration
+int cmd_syscall_test(int argc, char* argv[]);
+int cmd_syscall_info(int argc, char* argv[]);
+int cmd_malloc_test(int argc, char* argv[]);
+int cmd_file_create(int argc, char* argv[]);
+int cmd_file_read(int argc, char* argv[]);
+int cmd_heap_info(int argc, char* argv[]);
+int cmd_sleep_test(int argc, char* argv[]);

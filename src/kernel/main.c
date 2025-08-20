@@ -9,6 +9,7 @@
 #include <keyboard.h>
 #include <vga_text.h>
 #include <shell.h>
+#include <syscall.h>
 
 extern void _init();
 
@@ -25,6 +26,9 @@ void start(BootParams* bootParams)
     _init();
 
     HAL_Initialize();
+    
+    // Inicializar sistema de syscalls ANTES de habilitar interrupciones
+    syscall_initialize();
 
     keyboard_init();
     i686_IRQ_RegisterHandler(1, keyboard_handler);  // IRQ 1 = teclado
@@ -45,8 +49,15 @@ void start(BootParams* bootParams)
     log_err("Main", "This is an error msg!");
     log_crit("Main", "This is a critical msg!");
     
-    printf("OS MiqOSoft v0.17.5\n");
-    printf("This operating system is under construction.\n\n");
+    printf("OS MiqOSoft v0.18.0\n");
+    printf("This operating system is under construction.\n");
+    printf("System calls are now available!\n\n");
+    
+    // Demostrar que las syscalls funcionan
+    printf("Testing syscalls from kernel:\n");
+    sys_print("  Hello from sys_print!\n");
+    printf("  Current PID: %d\n", sys_getpid());
+    printf("  Current time: %u\n\n", sys_time());
 
     // Inicializar la shell
     shell_init();
