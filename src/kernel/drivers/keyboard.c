@@ -495,3 +495,41 @@ void keyboard_process_buffer(void) {
         else insert_char_multiline(c);
     }
 }
+
+char keyboard_scancode_to_ascii(uint8_t scancode) {
+    // Handle extended keys (preceded by 0xE0)
+    if (scancode >= 0x80) {
+        return 0; // Release codes, return nothing
+    }
+    
+    // Find the mapping in your existing keymap
+    for (int i = 0; i < sizeof(keymap)/sizeof(KeyMapping); i++) {
+        if (keymap[i].scancode == scancode) {
+            // Return the normal character (not considering shift/altgr for simplicity)
+            char ascii = keymap[i].normal;
+            
+            // Apply caps lock if it's a letter
+            if (!shift_pressed && !altgr_pressed) {
+                ascii = apply_caps_lock(ascii);
+            }
+            
+            return ascii;
+        }
+    }
+    
+    // Handle some common keys not in your keymap
+    switch (scancode) {
+        case KEY_ESCAPE: return 27; // ESC
+        case KEY_F1: return 0; // Function keys return 0 for now
+        case KEY_F2: return 0;
+        case KEY_F3: return 0;
+        case KEY_F4: return 0;
+        case KEY_F5: return 0;
+        case KEY_F6: return 0;
+        case KEY_F7: return 0;
+        case KEY_F8: return 0;
+        case KEY_F9: return 0;
+        case KEY_F10: return 0;
+        default: return 0; // Unknown scancode
+    }
+}

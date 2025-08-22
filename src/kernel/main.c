@@ -10,6 +10,7 @@
 #include <vga_text.h>
 #include <shell.h>
 #include <syscall.h>
+#include <shell_commands.h>
 
 extern void _init();
 

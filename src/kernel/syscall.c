@@ -11,7 +11,7 @@
 // Tabla de handlers de syscalls
 static syscall_handler_t syscall_handlers[SYSCALL_COUNT];
 
-// Simple heap allocator - en un SO real sería más sofisticado
+
 #define HEAP_START      0x400000    // 4MB
 #define HEAP_SIZE       0x100000    // 1MB
 #define BLOCK_SIZE      32          // Tamaño mínimo de bloque
@@ -95,7 +95,7 @@ static void vfs_init(void) {
 static int32_t sys_handler_exit(uint32_t code, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
     log_info("Syscall", "Process exit with code: %d", code);
     printf("Process exited with code: %d\n", code);
-    // En un SO real aquí se terminaría el proceso
+
     return SYSCALL_OK;
 }
 
@@ -297,30 +297,27 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
 }
 
 static int32_t sys_handler_getpid(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    // En este OS simple, solo hay un proceso con PID 1
+
     return 1;
 }
 
 static int32_t sys_handler_time(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    // Retornar tiempo simulado (en un OS real se leería del RTC)
     static uint32_t fake_time = 1000000;
     return fake_time++;
 }
 
 static int32_t sys_handler_sleep(uint32_t milliseconds, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    // Simulación de sleep - en un OS real se haría yield al scheduler
     log_info("Syscall", "Sleep requested for %d ms", milliseconds);
     
-    // Busy wait simple (no recomendado para uso real)
     for (volatile uint32_t i = 0; i < milliseconds * 1000; i++) {
-        // Esperar
+
     }
     
     return SYSCALL_OK;
 }
 
 static int32_t sys_handler_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    // En un OS real aquí se haría context switch
+
     log_info("Syscall", "Yield requested");
     return SYSCALL_OK;
 }
