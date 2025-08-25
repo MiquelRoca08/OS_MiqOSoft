@@ -55,6 +55,8 @@ int cmd_rm(int argc, char* argv[]);
 int cmd_find(int argc, char* argv[]);
 int cmd_grep(int argc, char* argv[]);
 int cmd_wc(int argc, char* argv[]);
+int cmd_create_file(int argc, char* argv[]);
+int cmd_edit(int argc, char* argv[]);
 
 // ============================================================================
 // HARDWARE Y DEBUGGING
@@ -84,7 +86,6 @@ int cmd_syscall_test(int argc, char* argv[]);
 int cmd_syscall_info(int argc, char* argv[]);
 int cmd_malloc_test(int argc, char* argv[]);
 int cmd_file_create(int argc, char* argv[]);
-int cmd_file_read(int argc, char* argv[]);
 int cmd_heap_info(int argc, char* argv[]);
 int cmd_sleep_test(int argc, char* argv[]);
 
@@ -99,8 +100,8 @@ int cmd_panic(int argc, char* argv[]);
 // TABLA DE COMANDOS Y FUNCIONES DE GESTIÓN
 // ============================================================================
 
-// Tabla principal de comandos (definida en shell_commands_unified.c)
-extern const ShellCommandEntry unified_shell_commands[];
+// Tabla principal de comandos
+extern const ShellCommandEntry commands[];
 
 // Funciones para gestionar la tabla de comandos
 int get_unified_command_count(void);

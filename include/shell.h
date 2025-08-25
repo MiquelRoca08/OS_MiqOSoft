@@ -12,21 +12,6 @@
 #define SHELL_PROMPT "MiqOs> "
 
 // ============================================================================
-// SISTEMA DE ARCHIVOS VIRTUAL
-// ============================================================================
-
-// Estructura para el sistema de archivos virtual
-typedef struct {
-    char name[64];
-    char content[256];
-    bool is_directory;
-    bool exists;
-} VirtualFile;
-
-// Declaración externa del sistema de archivos virtual
-extern VirtualFile virtual_fs[];
-
-// ============================================================================
 // FUNCIONES PRINCIPALES DE LA SHELL
 // ============================================================================
 

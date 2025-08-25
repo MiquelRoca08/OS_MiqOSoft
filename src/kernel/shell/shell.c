@@ -1,5 +1,5 @@
-#include "shell.h"
-#include "shell_commands.h"
+#include <shell.h>
+#include <shell_commands.h>
 #include <stdio.h>
 #include <memory.h>
 #include <vga_text.h>
@@ -31,25 +31,6 @@ static char command_history[HISTORY_SIZE][COMMAND_MAX_LEN];
 static int history_count = 0;
 static int history_index = -1;  // -1 significa comando actual (no en historial)
 static char current_command_backup[COMMAND_MAX_LEN];  // Backup del comando actual
-
-// ============================================================================
-// SISTEMA DE ARCHIVOS VIRTUAL (movido desde shell_advanced.c)
-// ============================================================================
-
-VirtualFile virtual_fs[] = {
-    {"README.txt", "Welcome to MiqOSoft!\nThis is a simple operating system written in C.", false, true},
-    {"kernel.log", "[BOOT] Kernel initialized\n[BOOT] HAL initialized\n[BOOT] Shell started", false, true},
-    {"test.txt", "This is a test file.\nHello, World!", false, true},
-    {"config.sys", "# MiqOSoft Configuration\nmemory=640\nvideo=vga\nkeyboard=us", false, true},
-    {"autoexec.bat", "@echo off\necho Welcome to MiqOSoft!\necho Type 'help' for commands", false, true},
-    {"welcome.txt", "Welcome to the MiqOSoft virtual file system!\nYou can use syscalls to interact with files.", false, true},
-    {"info.txt", "System calls are working!\nYou can use the syscall interface.", false, true},
-    {"bin", "", true, true},
-    {"dev", "", true, true},
-    {"tmp", "", true, true},
-    {"etc", "", true, true},
-    {"", "", false, false} // Terminador
-};
 
 // ============================================================================
 // FUNCIONES DE STRING PARA LA SHELL
@@ -273,7 +254,7 @@ void shell_init(void) {
     // IMPORTANTE: Activar el modo shell en el sistema de teclado
     keyboard_set_shell_mode(true);
     
-    printf("MiqOSoft Shell v1.0 - Unified Command System\n");
+    printf("MiqOSoft Shell v1.0\n");
     printf("Type 'help' for a list of available commands.\n");
     printf("Total commands available: %d\n", get_unified_command_count());
     
@@ -461,13 +442,6 @@ void shell_process_command(const char* input) {
     int argc = shell_parse_command(input, argv);
     
     if (argc == 0) return;
-    
-    // Manejar comando especial "exit"
-    if (shell_strcmp(argv[0], "exit") == 0) {
-        printf("Goodbye!\n");
-        shell_running = false;
-        return;
-    }
     
     // Buscar comando en la tabla unificada
     const ShellCommandEntry* cmd = find_unified_command(argv[0]);
