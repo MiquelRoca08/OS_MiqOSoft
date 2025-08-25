@@ -8,9 +8,6 @@
 #include <keyboard.h>
 #include <io.h>
 #include <x86.h>
-#include <string.h>
-#include <stdio.h>
-#include <memory.h>
 
 // ============================================================================
 // DECLARACIONES EXTERNAS
@@ -93,7 +90,7 @@ int cmd_help(int argc, char* argv[]) {
         {
             "Basic Commands",
             {"help - Show this help", "clear - Clear screen", "echo <text> - Display text",
-             "version - Show OS version", "history - Show command history", NULL}
+             "version - Show OS version", "exit - Exit shell", "history - Show command history", NULL}
         },
         {
             "System Information", 
@@ -116,7 +113,7 @@ int cmd_help(int argc, char* argv[]) {
         {
             "System Calls",
             {"syscall_test <type> - Test syscalls", "malloc_test <size> - Test malloc",
-             "file_create <name> - Create file", "heap_info - Heap status",
+             "file_create <name> - Create file", "file_read <name> - Read file", "heap_info - Heap status",
              "sleep_test <ms> - Test sleep", "syscall_info - Syscall documentation", NULL}
         },
         {
@@ -1202,6 +1199,41 @@ int cmd_file_create(int argc, char* argv[]) {
     return 0;
 }
 
+int cmd_file_read(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: file_read <filename>\n");
+        printf("Example: file_read welcome.txt\n");
+        return 1;
+    }
+    
+    const char* filename = argv[1];
+    
+    printf("Reading file: %s\n", filename);
+    
+    int32_t fd = sys_open(filename, OPEN_READ);
+    if (fd < 0) {
+        printf("Failed to open file: %s (error: %d)\n", filename, fd);
+        return 1;
+    }
+    
+    printf("File descriptor: %d\n", fd);
+    
+    char buffer[512];
+    memset(buffer, 0, sizeof(buffer));
+    int32_t bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1);
+    
+    printf("Read %d bytes:\n", bytes_read);
+    printf("--- File Content ---\n");
+    printf("%s", buffer);
+    if (bytes_read == sizeof(buffer) - 1) {
+        printf("... (file may be larger)\n");
+    }
+    printf("--- End Content ---\n");
+    
+    sys_close(fd);
+    return 0;
+}
+
 int cmd_heap_info(int argc, char* argv[]) {
     printf("=== Heap Information ===\n\n");
     
@@ -1274,6 +1306,7 @@ int cmd_syscall_info(int argc, char* argv[]) {
     printf("  syscall_test basic     - Test basic functionality\n");
     printf("  malloc_test 1024       - Test memory allocation\n");
     printf("  file_create test.txt   - Create a test file\n");
+    printf("  file_read test.txt     - Read a file\n");
     
     return 0;
 }
@@ -1395,6 +1428,7 @@ const ShellCommandEntry commands[] = {
     {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
     {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
     {"file_create",     "Create file via syscall",                          cmd_file_create},
+    {"file_read",       "Read file via syscall",                            cmd_file_read},
     {"heap_info",       "Show heap information and test",                   cmd_heap_info},
     {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info},
     {"sleep_test",      "Test sleep syscall",                               cmd_sleep_test},
@@ -1407,23 +1441,11 @@ const ShellCommandEntry commands[] = {
     {NULL, NULL, NULL}
 };
 
-int get_unified_command_count(void) {
-    return sizeof(commands) / sizeof(commands[0]);
-}
-
-const ShellCommandEntry* find_unified_command(const char* name) {
-    for (int i = 0; i < get_unified_command_count(); i++) {
-        if (strcmp(commands[i].name, name) == 0)
-            return &commands[i];
-    }
-    return NULL;
-}
-
 // ============================================================================
 // COMANDOS DE EDICIÓN DE ARCHIVOS
 // ============================================================================
 
-int cmd_create_file(int argc, char** argv) {
+int cmd_create_file(int argc, char* argv[]) {
     if (argc < 2) {
         printf("Usage: create_file <filename> [content]\n");
         return 1;
@@ -1432,147 +1454,156 @@ int cmd_create_file(int argc, char** argv) {
     char* filename = argv[1];
     int fd = sys_open(filename, OPEN_WRITE | OPEN_CREATE | OPEN_TRUNCATE);
     if (fd < 0) {
-        printf("Error: Could not create file %s\n", filename);
+        printf("Error: Could not create file '%s'\n", filename);
         return 1;
     }
 
-    // If content is provided as an argument, write it to the file
+    // If content is provided, write it to the file
     if (argc > 2) {
         char* content = argv[2];
         int len = shell_strlen(content);
-        sys_write(fd, content, len);
-        sys_close(fd);
-        printf("File created with provided content: %s\n", filename);
-        return 0;
-    }
-
-    // Otherwise, prompt for content
-    printf("Enter file content (press Enter on an empty line to finish):\n");
-    
-    char buffer[256];
-    char c;
-    int pos = 0;
-    
-    // Zero out buffer
-    for (int i = 0; i < sizeof(buffer); i++) {
-        buffer[i] = 0;
-    }
-    
-    while (1) {
-        // Use keyboard_buffer_pop instead of getc
-        if (keyboard_buffer_pop(&c)) {
-            if (c == '\n') {
-                buffer[pos] = '\0';
-                if (pos == 0) {
-                    break; // Empty line, end input
-                }
-                
-                // Write the line to the file
-                sys_write(fd, buffer, shell_strlen(buffer));
-                sys_write(fd, "\n", 1);
-                
-                // Reset buffer for next line
-                pos = 0;
-                for (int i = 0; i < sizeof(buffer); i++) {
-                    buffer[i] = 0;
-                }
-                
-                printf("\n");
-            } else if (c == '\b' && pos > 0) {
-                pos--;
-                printf("\b \b");
-            } else if (pos < sizeof(buffer) - 1 && c >= 32 && c <= 126) {
-                buffer[pos++] = c;
-                printf("%c", c);
+        int written = sys_write(fd, content, len);
+        if (written < len) {
+            printf("Warning: Only wrote %d of %d bytes\n", written, len);
+        }
+    } else {
+        // Interactive mode - allow user to enter content
+        printf("Enter file content (press Ctrl+D on empty line to finish):\n");
+        char buffer[256];
+        int line_count = 0;
+        
+        while (1) {
+            printf("%d> ", line_count + 1);
+            // Use shell_memset instead of memset
+            for (int i = 0; i < sizeof(buffer); i++) {
+                buffer[i] = 0;
             }
+            
+            // Read a line of input
+            int i = 0;
+            char c;
+            while (i < 255) {
+                c = getc();
+                if (c == '\n') break;
+                // Check for Ctrl+D (EOT)
+                if (c == 4 && i == 0) {
+                    goto end_input;
+                }
+                buffer[i++] = c;
+            }
+            buffer[i] = '\n';
+            
+            // Write the line to the file
+            sys_write(fd, buffer, i + 1);
+            line_count++;
         }
         
-        // Small delay to prevent CPU hogging
-        for (volatile int i = 0; i < 10000; i++);
+    end_input:
+        printf("\nFile saved with %d lines.\n", line_count);
     }
-    
+
     sys_close(fd);
-    printf("\nFile created: %s\n", filename);
+    printf("File '%s' created successfully.\n", filename);
     return 0;
 }
 
-int cmd_edit(int argc, char** argv) {
+int cmd_edit(int argc, char* argv[]) {
     if (argc < 2) {
         printf("Usage: edit <filename>\n");
         return 1;
     }
 
     char* filename = argv[1];
-    char buffer[256];
     
     // Try to open the file for reading first
     int fd = sys_open(filename, OPEN_READ);
-    if (fd >= 0) {
-        printf("File content:\n");
-        
-        // Read and display the file content
-        int bytes_read;
-        while ((bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1)) > 0) {
-            buffer[bytes_read] = '\0';
-            printf("%s", buffer);
+    if (fd < 0) {
+        printf("Creating new file: '%s'\n", filename);
+    } else {
+        // Read the file content
+        char buffer[4096];
+        int size = sys_read(fd, buffer, sizeof(buffer) - 1);
+        if (size < 0) {
+            printf("Error reading file '%s'\n", filename);
+            sys_close(fd);
+            return 1;
         }
-        
+        buffer[size] = '\0';
         sys_close(fd);
+        
+        // Display the file content
+        printf("File content (%d bytes):\n", size);
+        printf("%s\n", buffer);
     }
     
     // Open the file for writing
     fd = sys_open(filename, OPEN_WRITE | OPEN_CREATE | OPEN_TRUNCATE);
     if (fd < 0) {
-        printf("Error: Could not open file %s for editing\n", filename);
+        printf("Error: Could not open file '%s' for writing\n", filename);
         return 1;
     }
     
-    printf("\nEnter new content (press Enter on an empty line to finish):\n");
+    // Simple editor
+    printf("\n--- Simple Text Editor ---\n");
+    printf("Enter text line by line. Press Ctrl+D on an empty line to save and exit.\n");
     
-    char c;
-    int pos = 0;
-    
-    // Zero out buffer
-    for (int i = 0; i < sizeof(buffer); i++) {
-        buffer[i] = 0;
-    }
+    char buffer[256];
+    int line_count = 0;
     
     while (1) {
-        // Use keyboard_buffer_pop instead of getc
-        if (keyboard_buffer_pop(&c)) {
-            if (c == '\n') {
-                buffer[pos] = '\0';
-                if (pos == 0) {
-                    break; // Empty line, end input
-                }
-                
-                // Write the line to the file
-                sys_write(fd, buffer, shell_strlen(buffer));
-                sys_write(fd, "\n", 1);
-                
-                // Reset buffer for next line
-                pos = 0;
-                for (int i = 0; i < sizeof(buffer); i++) {
-                    buffer[i] = 0;
-                }
-                
-                printf("\n");
-            } else if (c == '\b' && pos > 0) {
-                pos--;
-                printf("\b \b");
-            } else if (pos < sizeof(buffer) - 1 && c >= 32 && c <= 126) {
-                buffer[pos++] = c;
-                printf("%c", c);
-            }
+        printf("%d> ", line_count + 1);
+        // Zero out buffer
+        for (int i = 0; i < sizeof(buffer); i++) {
+            buffer[i] = 0;
         }
         
-        // Small delay to prevent CPU hogging
-        for (volatile int i = 0; i < 10000; i++);
+        // Read a line of input
+        int i = 0;
+        char c;
+        while (i < 255) {
+            c = getc();
+            if (c == '\n') break;
+            // Check for Ctrl+D (EOT)
+            if (c == 4 && i == 0) {
+                goto end_edit;
+            }
+            buffer[i++] = c;
+        }
+        buffer[i] = '\n';
+        
+        // Write the line to the file
+        sys_write(fd, buffer, i + 1);
+        line_count++;
     }
     
+end_edit:
     sys_close(fd);
-    printf("\nFile saved: %s\n", filename);
+    printf("\nFile '%s' saved with %d lines.\n", filename, line_count);
     return 0;
+}
+
+// ============================================================================
+// FUNCIONES AUXILIARES PARA MANEJO DE COMANDOS
+// ============================================================================
+
+int get_unified_command_count(void) {
+    int count = 0;
+    while (unified_shell_commands[count].name != NULL) {
+        count++;
+    }
+    return count;
+}
+
+const ShellCommandEntry* find_unified_command(const char* name) {
+    if (!name) return NULL;
+    
+    for (int i = 0; unified_shell_commands[i].name != NULL; i++) {
+        if (shell_strcmp(unified_shell_commands[i].name, name) == 0) {
+            return &unified_shell_commands[i];
+        }
+    }
+    
+    return NULL;
 }
 
 /*
