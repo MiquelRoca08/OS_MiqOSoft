@@ -47,6 +47,74 @@ void* shell_memset(void* s, int c, size_t n) {
     return s;
 }
 
+// Simple getc implementation for shell
+char shell_getc(void) {
+    char c;
+    while (!keyboard_buffer_pop(&c)) {
+        keyboard_process_buffer();
+    }
+    return c;
+}
+
+// Simple snprintf implementation
+int shell_snprintf(char* str, size_t size, const char* format, ...) {
+    // Very basic implementation - just handle %d and %s
+    const char* src = format;
+    char* dst = str;
+    size_t written = 0;
+    
+    // Get variable arguments (simplified)
+    int* args = (int*)((char*)&format + sizeof(format));
+    int arg_index = 0;
+    
+    while (*src && written < size - 1) {
+        if (*src == '%' && *(src + 1)) {
+            src++; // skip %
+            if (*src == 'd') {
+                // Convert integer to string
+                int val = args[arg_index++];
+                char temp[16];
+                int len = 0;
+                if (val == 0) {
+                    temp[len++] = '0';
+                } else {
+                    if (val < 0) {
+                        *dst++ = '-';
+                        written++;
+                        val = -val;
+                    }
+                    char digits[16];
+                    int digit_count = 0;
+                    while (val > 0) {
+                        digits[digit_count++] = '0' + (val % 10);
+                        val /= 10;
+                    }
+                    for (int i = digit_count - 1; i >= 0; i--) {
+                        temp[len++] = digits[i];
+                    }
+                }
+                for (int i = 0; i < len && written < size - 1; i++) {
+                    *dst++ = temp[i];
+                    written++;
+                }
+            } else if (*src == 's') {
+                // Copy string
+                char* s = (char*)args[arg_index++];
+                while (*s && written < size - 1) {
+                    *dst++ = *s++;
+                    written++;
+                }
+            }
+            src++;
+        } else {
+            *dst++ = *src++;
+            written++;
+        }
+    }
+    *dst = '\0';
+    return written;
+}
+
 // Función auxiliar para conversión hexadecimal
 uint32_t hex_str_to_int(const char* hex_str) {
     uint32_t result = 0;
@@ -113,8 +181,8 @@ int cmd_help(int argc, char* argv[]) {
         {
             "System Calls",
             {"syscall_test <type> - Test syscalls", "malloc_test <size> - Test malloc",
-             "file_create <name> - Create file", "file_read <name> - Read file", "heap_info - Heap status",
-             "sleep_test <ms> - Test sleep", "syscall_info - Syscall documentation", NULL}
+             "heap_info - Heap status", "sleep_test <ms> - Test sleep",
+             "syscall_info - Syscall documentation", NULL}
         },
         {
             "System Control",
@@ -1097,12 +1165,12 @@ int cmd_syscall_test(int argc, char* argv[]) {
         success = 0;
         failed = 0;
         for (int i = 0; i < 10; i++) {
-            snprintf(filename, sizeof(filename), "stress_%d.txt", i);
+            shell_snprintf(filename, sizeof(filename), "stress_%d.txt", i);
             int32_t fd = sys_open(filename, OPEN_CREATE | OPEN_WRITE);
             if (fd >= 0) {
                 success++;
                 char data[64];
-                snprintf(data, sizeof(data), "Stress test file #%d\n", i);
+                shell_snprintf(data, sizeof(data), "Stress test file #%d\n", i);
                 sys_write(fd, data, strlen(data));
                 sys_close(fd);
             } else {
@@ -1156,81 +1224,6 @@ int cmd_malloc_test(int argc, char* argv[]) {
         printf("Allocation failed - out of memory\n");
     }
     
-    return 0;
-}
-
-int cmd_file_create(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: file_create <filename> [content]\n");
-        printf("Example: file_create myfile.txt \"Hello World\"\n");
-        return 1;
-    }
-    
-    const char* filename = argv[1];
-    const char* content = argc > 2 ? argv[2] : "Default file content\n";
-    
-    printf("Creating file: %s\n", filename);
-    
-    int32_t fd = sys_open(filename, OPEN_CREATE | OPEN_WRITE);
-    if (fd < 0) {
-        printf("Failed to create file: %s (error: %d)\n", filename, fd);
-        return 1;
-    }
-    
-    printf("File descriptor: %d\n", fd);
-    
-    int32_t bytes_written = sys_write(fd, content, strlen(content));
-    printf("Wrote %d bytes\n", bytes_written);
-    
-    sys_close(fd);
-    printf("File closed successfully\n");
-    
-    // Verificar leyendo el archivo
-    printf("\nVerifying by reading back:\n");
-    fd = sys_open(filename, OPEN_READ);
-    if (fd >= 0) {
-        char buffer[256];
-        memset(buffer, 0, sizeof(buffer));
-        int32_t bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1);
-        printf("Read %d bytes: %s\n", bytes_read, buffer);
-        sys_close(fd);
-    }
-    
-    return 0;
-}
-
-int cmd_file_read(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: file_read <filename>\n");
-        printf("Example: file_read welcome.txt\n");
-        return 1;
-    }
-    
-    const char* filename = argv[1];
-    
-    printf("Reading file: %s\n", filename);
-    
-    int32_t fd = sys_open(filename, OPEN_READ);
-    if (fd < 0) {
-        printf("Failed to open file: %s (error: %d)\n", filename, fd);
-        return 1;
-    }
-    
-    printf("File descriptor: %d\n", fd);
-    
-    char buffer[512];
-    memset(buffer, 0, sizeof(buffer));
-    int32_t bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1);
-    
-    printf("Read %d bytes:\n", bytes_read);
-    printf("--- File Content ---\n");
-    printf("%s", buffer);
-    if (bytes_read == sizeof(buffer) - 1) {
-        printf("... (file may be larger)\n");
-    }
-    printf("--- End Content ---\n");
-    
-    sys_close(fd);
     return 0;
 }
 
@@ -1305,8 +1298,6 @@ int cmd_syscall_info(int argc, char* argv[]) {
     printf("\nUsage examples:\n");
     printf("  syscall_test basic     - Test basic functionality\n");
     printf("  malloc_test 1024       - Test memory allocation\n");
-    printf("  file_create test.txt   - Create a test file\n");
-    printf("  file_read test.txt     - Read a file\n");
     
     return 0;
 }
@@ -1378,70 +1369,6 @@ int cmd_panic(int argc, char* argv[]) {
 }
 
 // ============================================================================
-// TABLA DE COMANDOS UNIFICADA
-// ============================================================================
-
-const ShellCommandEntry commands[] = {
-    // Comandos básicos
-    {"help",            "Show available commands",                          cmd_help},
-    {"clear",           "Clear the screen",                                 cmd_clear},
-    {"echo",            "Display a line of text",                           cmd_echo},
-    {"version",         "Show OS version information",                      cmd_version},
-    {"history",         "Show command history",                             cmd_history},
-    
-    // Información del sistema
-    {"memory",          "Show memory information",                          cmd_memory},
-    {"uptime",          "Show system uptime",                               cmd_uptime},
-    {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
-    {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
-    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod},
-    {"dmesg",           "Show kernel messages",                             cmd_dmesg},
-    {"ps",              "Show running processes",                           cmd_ps},
-    {"lspci",           "List PCI devices",                                 cmd_lspci},
-    
-    // Sistema de archivos
-    {"ls",              "List directory contents",                          cmd_ls},
-    {"cat",             "Display file contents",                            cmd_cat},
-    {"mkdir",           "Create directory",                                 cmd_mkdir},
-    {"rm",              "Remove file or directory",                         cmd_rm},
-    {"find",            "Find files by name pattern",                       cmd_find},
-    {"grep",            "Search text in files",                             cmd_grep},
-    {"wc",              "Count lines, words and characters",                cmd_wc},
-    {"create_file",     "Create a new file",                                cmd_create_file},
-    {"edit",            "Edit a text file",                                 cmd_edit},
-    
-    // Hardware y debugging
-    {"memtest",         "Run basic memory test",                            cmd_memtest},
-    {"ports",           "Read/write I/O ports",                             cmd_ports},
-    {"interrupt",       "Control interrupt state",                          cmd_interrupt},
-    {"hexdump",         "Display memory in hexadecimal",                    cmd_hexdump},
-    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest},
-    {"benchmark",       "Run CPU benchmark",                                cmd_benchmark},
-    {"registers",       "Show CPU register values",                         cmd_registers},
-    {"stack",           "Show stack contents",                              cmd_stack},
-    
-    // Red (stubs)
-    {"ping",            "Send ICMP echo requests",                          cmd_ping},
-    {"netstat",         "Show network statistics",                          cmd_netstat},
-    
-    // System calls
-    {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
-    {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
-    {"file_create",     "Create file via syscall",                          cmd_file_create},
-    {"file_read",       "Read file via syscall",                            cmd_file_read},
-    {"heap_info",       "Show heap information and test",                   cmd_heap_info},
-    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info},
-    {"sleep_test",      "Test sleep syscall",                               cmd_sleep_test},
-    
-    // Control del sistema
-    {"reboot",          "Restart the system",                               cmd_reboot},
-    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic},
-    
-    // Terminador
-    {NULL, NULL, NULL}
-};
-
-// ============================================================================
 // COMANDOS DE EDICIÓN DE ARCHIVOS
 // ============================================================================
 
@@ -1475,15 +1402,13 @@ int cmd_create_file(int argc, char* argv[]) {
         while (1) {
             printf("%d> ", line_count + 1);
             // Use shell_memset instead of memset
-            for (int i = 0; i < sizeof(buffer); i++) {
-                buffer[i] = 0;
-            }
+            shell_memset(buffer, 0, sizeof(buffer));
             
             // Read a line of input
             int i = 0;
             char c;
             while (i < 255) {
-                c = getc();
+                c = shell_getc();
                 if (c == '\n') break;
                 // Check for Ctrl+D (EOT)
                 if (c == 4 && i == 0) {
@@ -1553,15 +1478,13 @@ int cmd_edit(int argc, char* argv[]) {
     while (1) {
         printf("%d> ", line_count + 1);
         // Zero out buffer
-        for (int i = 0; i < sizeof(buffer); i++) {
-            buffer[i] = 0;
-        }
+        shell_memset(buffer, 0, sizeof(buffer));
         
         // Read a line of input
         int i = 0;
         char c;
         while (i < 255) {
-            c = getc();
+            c = shell_getc();
             if (c == '\n') break;
             // Check for Ctrl+D (EOT)
             if (c == 4 && i == 0) {
@@ -1583,26 +1506,83 @@ end_edit:
 }
 
 // ============================================================================
+// TABLA DE COMANDOS UNIFICADA
+// ============================================================================
+
+const ShellCommandEntry shell_commands[] = {
+    // Comandos básicos
+    {"help",            "Show available commands",                          cmd_help},
+    {"clear",           "Clear the screen",                                 cmd_clear},
+    {"echo",            "Display a line of text",                           cmd_echo},
+    {"version",         "Show OS version information",                      cmd_version},
+    {"history",         "Show command history",                             cmd_history}, // FIXME
+    
+    // Información del sistema
+    {"memory",          "Show memory information",                          cmd_memory},
+    {"uptime",          "Show system uptime",                               cmd_uptime}, // FIXME
+    {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
+    {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
+    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod},
+    {"dmesg",           "Show kernel messages",                             cmd_dmesg},
+    {"ps",              "Show running processes",                           cmd_ps}, // FIXME
+    {"lspci",           "List PCI devices",                                 cmd_lspci}, // FIXME
+    
+    // Sistema de archivos
+    {"ls",              "List directory contents",                          cmd_ls},
+    {"cat",             "Display file contents",                            cmd_cat}, // FIXME
+    {"mkdir",           "Create directory",                                 cmd_mkdir}, // FIXME
+    {"rm",              "Remove file or directory",                         cmd_rm}, // FIXME
+    {"find",            "Find files by name pattern",                       cmd_find}, // FIXME
+    {"grep",            "Search text in files",                             cmd_grep},
+    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME QUASI
+    {"create_file",     "Create a new file",                                cmd_create_file},
+    {"edit",            "Edit a text file",                                 cmd_edit}, // FIXME
+    
+    // Hardware y debugging
+    {"memtest",         "Run basic memory test",                            cmd_memtest},
+    {"ports",           "Read/write I/O ports",                             cmd_ports}, // FIXME
+    {"interrupt",       "Control interrupt state",                          cmd_interrupt},
+    {"hexdump",         "Display memory in hexadecimal",                    cmd_hexdump},
+    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest}, // FIXME
+    {"benchmark",       "Run CPU benchmark",                                cmd_benchmark},
+    {"registers",       "Show CPU register values",                         cmd_registers},
+    {"stack",           "Show stack contents",                              cmd_stack}, // FIXME
+    
+    // Red (stubs)
+    {"ping",            "Send ICMP echo requests",                          cmd_ping}, // FIXME
+    {"netstat",         "Show network statistics",                          cmd_netstat}, // FIXME
+    
+    // System calls
+    {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
+    {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
+    {"heap_info",       "Show heap information and test",                   cmd_heap_info},
+    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, // FIXME
+    {"sleep_test",      "Test sleep syscall",                               cmd_sleep_test}, // FIXME
+    
+    // Control del sistema
+    {"reboot",          "Restart the system",                               cmd_reboot},
+    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic},
+    
+    // Terminador
+    {NULL, NULL, NULL}
+};
+
+// ============================================================================
 // FUNCIONES AUXILIARES PARA MANEJO DE COMANDOS
 // ============================================================================
 
-int get_unified_command_count(void) {
+int get_shell_command_count(void) {
     int count = 0;
-    while (unified_shell_commands[count].name != NULL) {
-        count++;
-    }
+    while (shell_commands[count].name != NULL) count++;
     return count;
 }
 
-const ShellCommandEntry* find_unified_command(const char* name) {
-    if (!name) return NULL;
-    
-    for (int i = 0; unified_shell_commands[i].name != NULL; i++) {
-        if (shell_strcmp(unified_shell_commands[i].name, name) == 0) {
-            return &unified_shell_commands[i];
+const ShellCommandEntry* find_shell_command(const char* name) {
+    for (int i = 0; shell_commands[i].name != NULL; i++) {
+        if (shell_strcmp(shell_commands[i].name, name) == 0) {
+            return &shell_commands[i];
         }
     }
-    
     return NULL;
 }
 
@@ -1617,7 +1597,6 @@ TODO:
 - cmd_rm sea real
 - cmd_find sea real-----------------
 - cmd_grep sea real-----------------
-- cmd_wc sea real-------------------
 - cmd_ports da error 1
 - cmd_stack no funciona bien
 - cmd_syscall_info se corta

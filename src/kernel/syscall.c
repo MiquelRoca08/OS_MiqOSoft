@@ -282,7 +282,7 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
         if (!new_data) return SYSCALL_OUT_OF_MEMORY;
         
         memcpy(new_data, file->data, file->size);
-        sys_free((uint32_t)file->data);
+        sys_free(file->data);
         file->data = new_data;
         file->capacity = new_capacity;
     }

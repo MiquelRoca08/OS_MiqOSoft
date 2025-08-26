@@ -256,7 +256,7 @@ void shell_init(void) {
     
     printf("MiqOSoft Shell v1.0\n");
     printf("Type 'help' for a list of available commands.\n");
-    printf("Total commands available: %d\n", get_unified_command_count());
+    printf("Total commands available: %d\n", get_shell_command_count());
     
     printf("\n");
     
@@ -444,7 +444,7 @@ void shell_process_command(const char* input) {
     if (argc == 0) return;
     
     // Buscar comando en la tabla unificada
-    const ShellCommandEntry* cmd = find_unified_command(argv[0]);
+    const ShellCommandEntry* cmd = find_shell_command(argv[0]);
     if (cmd && cmd->function) {
         int result = cmd->function(argc, argv);
         if (result != 0) {

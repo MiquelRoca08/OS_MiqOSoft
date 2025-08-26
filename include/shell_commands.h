@@ -85,7 +85,6 @@ int cmd_netstat(int argc, char* argv[]);
 int cmd_syscall_test(int argc, char* argv[]);
 int cmd_syscall_info(int argc, char* argv[]);
 int cmd_malloc_test(int argc, char* argv[]);
-int cmd_file_create(int argc, char* argv[]);
 int cmd_heap_info(int argc, char* argv[]);
 int cmd_sleep_test(int argc, char* argv[]);
 
@@ -104,8 +103,8 @@ int cmd_panic(int argc, char* argv[]);
 extern const ShellCommandEntry commands[];
 
 // Funciones para gestionar la tabla de comandos
-int get_unified_command_count(void);
-const ShellCommandEntry* find_unified_command(const char* name);
+int get_shell_command_count(void);
+const ShellCommandEntry* find_shell_command(const char* name);
 
 // ============================================================================
 // FUNCIONES AUXILIARES
