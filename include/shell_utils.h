@@ -54,20 +54,3 @@ int vprintf(const char* format, va_list args);
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
-
-// ============================================================================
-// NOTAS PARA EL DESARROLLADOR
-// ============================================================================
-
-/*
- * Este header ha sido simplificado significativamente en la versión unificada.
- * 
- * Funciones que se movieron:
- * - Todas las funciones de string -> shell.h (como funciones internas)
- * - Todas las declaraciones de comandos -> shell_commands.h
- * - Funciones de conversión -> implementadas como static en shell_commands_unified.c
- * 
- * Si necesitas acceso a las funciones de conversión desde otros archivos,
- * puedes cambiar su definición de 'static' a 'extern' en shell_commands_unified.c
- * y agregarlas aquí.
- */

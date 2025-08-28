@@ -7,10 +7,10 @@
 #include <debug.h>
 #include <vga_text.h>
 #include <io.h>
+#include <time.h>
 
 // Tabla de handlers de syscalls
 static syscall_handler_t syscall_handlers[SYSCALL_COUNT];
-
 
 #define HEAP_START      0x400000    // 4MB
 #define HEAP_SIZE       0x100000    // 1MB
@@ -301,21 +301,20 @@ static int32_t sys_handler_getpid(uint32_t arg1, uint32_t arg2, uint32_t arg3, u
     return 1;
 }
 
-static int32_t sys_handler_time(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    static uint32_t fake_time = 1000000;
-    return fake_time++;
+static long sys_handler_time(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    (void)a; (void)b; (void)c; (void)d;
+    return (long)sys_time();
 }
 
-static int32_t sys_handler_sleep(uint32_t milliseconds, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    log_info("Syscall", "Sleep requested for %d ms", milliseconds);
-    
-    for (volatile uint32_t i = 0; i < milliseconds * 1000; i++) {
+static long sys_handler_sleep(uint32_t ms, uint32_t b, uint32_t c, uint32_t d) {
+    (void)b; (void)c; (void)d;
 
+    uint32_t end = sys_time() + ms;
+    while (sys_time() < end) {
+        __asm__ volatile("sti; hlt; cli");
     }
-    
-    return SYSCALL_OK;
+    return 0;
 }
-
 static int32_t sys_handler_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
 
     log_info("Syscall", "Yield requested");

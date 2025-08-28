@@ -14,15 +14,8 @@
 
 extern void _init();
 
-void crash_me();
-
-void timer(Registers* regs)
-{
-    printf(".");
-}
-
 void start(BootParams* bootParams)
-{   
+{
     // call global constructors
     _init();
 
@@ -45,29 +38,19 @@ void start(BootParams* bootParams)
             bootParams->Memory.Regions[i].Type);
     }
 
-    log_info("Main", "This is an info msg!");
-    log_warn("Main", "This is a warning msg!");
-    log_err("Main", "This is an error msg!");
-    log_crit("Main", "This is a critical msg!");
-    
-    printf("OS MiqOSoft v0.18.0\n");
+    printf("OS MiqOSoft v0.18.4\n");
     printf("This operating system is under construction.\n");
     printf("System calls are now available!\n\n");
     
-    // Demostrar que las syscalls funcionan
-    printf("Testing syscalls from kernel:\n");
-    sys_print("  Hello from sys_print!\n");
-    printf("  Current PID: %d\n", sys_getpid());
-    printf("  Current time: %u\n\n", sys_time());
-
-    // Inicializar la shell
+    // Inicializar y ejecutar la shell para que el SO no termine.
+    // Esto reemplaza las pruebas de syscalls para que el sistema avance.
+    log_info("Main", "Entering main shell loop...");
     shell_init();
-
-    // Loop principal - ahora manejado por la shell
-    while (1) {
+    
+    // Bucle principal del sistema operativo.
+    // Esto mantiene el programa en ejecución y permite al usuario interactuar con la shell.
+    while(1)
+    {
         shell_run();
     }
-
-end:
-    for (;;);
 }

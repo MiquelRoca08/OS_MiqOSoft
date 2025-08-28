@@ -4,6 +4,7 @@
 #include <isr.h>
 #include <irq.h>
 #include <vga_text.h>
+#include <time.h>
 
 void HAL_Initialize()
 {
@@ -12,4 +13,5 @@ void HAL_Initialize()
     i686_IDT_Initialize();
     i686_ISR_Initialize();
     i686_IRQ_Initialize();
+    time_init();
 }

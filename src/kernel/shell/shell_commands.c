@@ -24,6 +24,9 @@ extern char* shell_strncpy(char* dest, const char* src, int n);
 extern void syscall_run_all_tests(void);
 extern void syscall_test_heap_integrity(void);
 
+// Funciones del subsistema de tiempo
+extern uint32_t sys_time(void);
+
 // ============================================================================
 // UTILIDADES AUXILIARES
 // ============================================================================
@@ -40,11 +43,35 @@ void* shell_memcpy(void* dest, const void* src, size_t n) {
 
 // Implementación simple de memset 
 void* shell_memset(void* s, int c, size_t n) {
-    unsigned char* p = (unsigned char*)s;
-    for (size_t i = 0; i < n; i++) {
-        p[i] = (unsigned char)c;
+    unsigned char* p = s;
+    while (n--) {
+        *p++ = (unsigned char)c;
     }
     return s;
+}
+
+// Conversión de entero a cadena
+void format_number(char* buffer, int num) {
+    if (num == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return;
+    }
+
+    int i = 0;
+    int temp_num = num;
+    char temp_str[11]; // Max 10 digits for a 32-bit int + null terminator
+
+    while (temp_num > 0) {
+        temp_str[i++] = (temp_num % 10) + '0';
+        temp_num /= 10;
+    }
+
+    int j = 0;
+    while (i > 0) {
+        buffer[j++] = temp_str[--i];
+    }
+    buffer[j] = '\0';
 }
 
 // Simple getc implementation for shell
@@ -241,7 +268,7 @@ int cmd_echo(int argc, char* argv[]) {
 }
 
 int cmd_version(int argc, char* argv[]) {
-    printf("MiqOSoft Kernel v0.18\n");
+    printf("MiqOSoft Kernel v0.18.4\n");
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
@@ -253,6 +280,18 @@ int cmd_history(int argc, char* argv[]) {
     // Esta función será implementada por shell.c ya que accede a variables estáticas
     extern int shell_show_history(void);
     return shell_show_history();
+}
+
+int cmd_test_all(int argc, char* argv[]) {
+    printf("Running all system call tests...\n");
+    syscall_run_all_tests();
+    return 0;
+}
+
+int cmd_test_heap_integrity(int argc, char* argv[]) {
+    printf("Testing heap integrity...\n");
+    syscall_test_heap_integrity();
+    return 0;
 }
 
 // ============================================================================
@@ -313,9 +352,16 @@ int cmd_memory(int argc, char* argv[]) {
 }
 
 int cmd_uptime(int argc, char* argv[]) {
-    uint32_t time = sys_time();
-    printf("System uptime: %u time units\n", time);
-    printf("Note: Real-time clock not implemented\n");
+    uint32_t milliseconds = sys_time();
+    uint32_t seconds = milliseconds / 1000;
+    uint32_t minutes = seconds / 60;
+    uint32_t hours = minutes / 60;
+
+    seconds %= 60;
+    minutes %= 60;
+    
+    printf("System has been up for: %u hours, %u minutes, %u seconds\n", hours, minutes, seconds);
+
     return 0;
 }
 
@@ -1516,6 +1562,8 @@ const ShellCommandEntry shell_commands[] = {
     {"echo",            "Display a line of text",                           cmd_echo},
     {"version",         "Show OS version information",                      cmd_version},
     {"history",         "Show command history",                             cmd_history}, // FIXME
+    {"test",            "Run all syscall tests",                            cmd_test_all},
+    {"heap_test",       "Run heap integrity test",                          cmd_test_heap_integrity},
     
     // Información del sistema
     {"memory",          "Show memory information",                          cmd_memory},
@@ -1601,4 +1649,5 @@ TODO:
 - cmd_stack no funciona bien
 - cmd_syscall_info se corta
 - cmd_syscall_sleep no funciona bien
+- cmd_exit quitar
 */

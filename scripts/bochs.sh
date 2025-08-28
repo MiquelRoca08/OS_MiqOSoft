@@ -22,11 +22,11 @@ megs: 128
 romimage: file=/usr/share/bochs/BIOS-bochs-latest
 vgaromimage: file=/usr/share/bochs/VGABIOS-lgpl-latest
 mouse: enabled=0
-display_library: x, options="gui_debug"
+display_library: sdl2, options="gui_debug"
 
 $DISK_CFG
 $BOOT_CFG
 EOF
 
-bochs-debugger -q -f .bochs_config
+bochs -q -f .bochs_config
 rm -f .bochs_config
