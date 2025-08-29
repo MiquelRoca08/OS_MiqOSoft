@@ -171,79 +171,132 @@ uint32_t dec_str_to_int(const char* dec_str) {
 }
 
 // ============================================================================
+// FUNCIÓN AUXILIAR PARA CATEGORIZACIÓN DE COMANDOS
+// ============================================================================
+
+const char* get_command_category(const char* name) {
+    // Categorías para organizar los comandos
+    const char* categories[] = {
+        "Basic Commands",
+        "System Information",
+        "File System",
+        "Hardware & Debug",
+        "System Calls",
+        "System Control",
+        "Network"
+    };
+    
+    // Comandos básicos
+    if (shell_strcmp(name, "help") == 0 || shell_strcmp(name, "clear") == 0 ||
+        shell_strcmp(name, "echo") == 0 || shell_strcmp(name, "version") == 0 ||
+        shell_strcmp(name, "test") == 0 || shell_strcmp(name, "heap_test") == 0) {
+        return categories[0];
+    }
+    // Información del sistema
+    else if (shell_strcmp(name, "memory") == 0 || shell_strcmp(name, "uptime") == 0 ||
+             shell_strcmp(name, "cpuinfo") == 0 || shell_strcmp(name, "cpuid") == 0 ||
+             shell_strcmp(name, "lsmod") == 0 || shell_strcmp(name, "dmesg") == 0 ||
+             shell_strcmp(name, "ps") == 0 || shell_strcmp(name, "lspci") == 0) {
+        return categories[1];
+    }
+    // Sistema de archivos
+    else if (shell_strcmp(name, "ls") == 0 || shell_strcmp(name, "cat") == 0 ||
+             shell_strcmp(name, "mkdir") == 0 || shell_strcmp(name, "rm") == 0 ||
+             shell_strcmp(name, "find") == 0 || shell_strcmp(name, "grep") == 0 ||
+             shell_strcmp(name, "wc") == 0 || shell_strcmp(name, "create_file") == 0 ||
+             shell_strcmp(name, "edit") == 0) {
+        return categories[2];
+    }
+    // Hardware y debugging
+    else if (shell_strcmp(name, "memtest") == 0 || shell_strcmp(name, "ports") == 0 ||
+             shell_strcmp(name, "interrupt") == 0 || shell_strcmp(name, "hexdump") == 0 ||
+             shell_strcmp(name, "keytest") == 0 || shell_strcmp(name, "benchmark") == 0 ||
+             shell_strcmp(name, "registers") == 0 || shell_strcmp(name, "stack") == 0) {
+        return categories[3];
+    }
+    // System calls
+    else if (shell_strcmp(name, "syscall_test") == 0 || shell_strcmp(name, "malloc_test") == 0 ||
+             shell_strcmp(name, "heap_info") == 0 || shell_strcmp(name, "syscall_info") == 0 ||
+             shell_strcmp(name, "sleep") == 0) {
+        return categories[4];
+    }
+    // Control del sistema
+    else if (shell_strcmp(name, "reboot") == 0 || shell_strcmp(name, "panic") == 0) {
+        return categories[5];
+    }
+    // Red
+    else if (shell_strcmp(name, "ping") == 0 || shell_strcmp(name, "netstat") == 0) {
+        return categories[6];
+    }
+    // Categoría por defecto
+    return "Other Commands";
+}
+
+// ============================================================================
 // COMANDOS BÁSICOS DE SISTEMA
 // ============================================================================
+
+extern const ShellCommandEntry shell_commands[];
 
 int cmd_help(int argc, char* argv[]) {
     printf("=== MiqOSoft Shell Commands ===\n\n");
     
-    // Definir comandos con categorías
-    struct {
-        const char* category;
-        const char* commands[20];
-    } categories[] = {
-        {
-            "Basic Commands",
-            {"help - Show this help", "clear - Clear screen", "echo <text> - Display text",
-             "version - Show OS version", "exit - Exit shell", "history - Show command history", NULL}
-        },
-        {
-            "System Information", 
-            {"memory - Memory information", "uptime - System uptime", "cpuinfo - CPU information",
-             "cpuid - Detailed CPU info", "lsmod - List kernel modules", "dmesg - Kernel messages",
-             "ps - Show processes", NULL}
-        },
-        {
-            "File System",
-            {"ls - List files", "cat <file> - Show file content", "mkdir <dir> - Create directory",
-             "rm <file> - Remove file", "find <pattern> - Find files", "grep <pattern> <file> - Search in file",
-             "wc <file> - Count lines/words", NULL}
-        },
-        {
-            "Hardware & Debug",
-            {"ports <read|write> - I/O port access", "interrupt <enable|disable> - Control interrupts",
-             "hexdump <addr> <len> - Memory dump", "keytest - Keyboard test", "benchmark - CPU benchmark",
-             "registers - Show CPU registers", "stack - Show stack dump", "memtest - Memory test", NULL}
-        },
-        {
-            "System Calls",
-            {"syscall_test <type> - Test syscalls", "malloc_test <size> - Test malloc",
-             "heap_info - Heap status", "sleep_test <ms> - Test sleep",
-             "syscall_info - Syscall documentation", NULL}
-        },
-        {
-            "System Control",
-            {"reboot - Restart system", "panic - Trigger kernel panic", NULL}
-        }
+    // Categorías para organizar los comandos
+    const char* categories[] = {
+        "Basic Commands",
+        "System Information",
+        "File System",
+        "Hardware & Debug",
+        "System Calls",
+        "System Control",
+        "Network"
     };
     
     const int LINES_PER_PAGE = 20;
     int line_count = 0;
     
-    for (int cat = 0; cat < 6; cat++) {
-        printf("[%s]\n", categories[cat].category);
+    // Mostrar comandos por categoría
+    for (int cat = 0; cat < 7; cat++) {
+        bool category_has_commands = false;
+        
+        // Primera pasada: verificar si la categoría tiene comandos
+        for (int i = 0; shell_commands[i].name != NULL; i++) {
+            if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
+                category_has_commands = true;
+                break;
+            }
+        }
+        
+        if (!category_has_commands) {
+            continue;
+        }
+        
+        printf("[%s]\n", categories[cat]);
         line_count++;
         
-        for (int cmd = 0; categories[cat].commands[cmd] != NULL; cmd++) {
-            printf("  %s\n", categories[cat].commands[cmd]);
-            line_count++;
-            
-            // Paginación
-            if (line_count >= LINES_PER_PAGE) {
-                printf("\nPress any key to continue (q to quit)...");
-                char c;
-                bool key_pressed = false;
-                while (!key_pressed) {
-                    if (keyboard_buffer_pop(&c)) {
-                        key_pressed = true;
-                        if (c == 'q' || c == 'Q') {
-                            printf("\n");
-                            return 0;
+        // Segunda pasada: mostrar comandos de esta categoría
+        for (int i = 0; shell_commands[i].name != NULL; i++) {
+            if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
+                printf("  %s - %s\n", shell_commands[i].name, shell_commands[i].description);
+                line_count++;
+                
+                // Paginación
+                if (line_count >= LINES_PER_PAGE) {
+                    printf("\nPress any key to continue (q to quit)...");
+                    char c;
+                    bool key_pressed = false;
+                    while (!key_pressed) {
+                        if (keyboard_buffer_pop(&c)) {
+                            key_pressed = true;
+                            if (c == 'q' || c == 'Q') {
+                                printf("\n");
+                                return 0;
+                            }
                         }
                     }
+                    printf("\r                                           \r");
+                    line_count = 0;
                 }
-                printf("\r                                           \r");
-                line_count = 0;
             }
         }
         printf("\n");
@@ -274,12 +327,6 @@ int cmd_version(int argc, char* argv[]) {
     printf("Shell: MiqOSoft Shell v1.0\n");
     printf("Features: System calls, VFS, Memory management\n");
     return 0;
-}
-
-int cmd_history(int argc, char* argv[]) {
-    // Esta función será implementada por shell.c ya que accede a variables estáticas
-    extern int shell_show_history(void);
-    return shell_show_history();
 }
 
 int cmd_test_all(int argc, char* argv[]) {
@@ -450,7 +497,7 @@ int cmd_dmesg(int argc, char* argv[]) {
     printf("[0.002] IDT initialized\n");
     printf("[0.003] ISR handlers installed\n");
     printf("[0.004] IRQ handlers installed\n");
-    printf("[0.005] PIC initialized\n");
+    printf("[0.005) PIC initialized\n");
     printf("[0.006] Keyboard driver loaded\n");
     printf("[0.007] System calls initialized\n");
     printf("[0.008] Shell initialized\n");
@@ -488,14 +535,12 @@ int cmd_ls(int argc, char* argv[]) {
     printf("%-20s %-10s %s\n", "Name", "Type", "Size");
     printf("----------------------------------------\n");
     
-    // Usar syscalls para listar archivos
     int32_t dir_fd = sys_open(".", OPEN_READ);
     if (dir_fd < 0) {
         printf("Error: Could not open directory (error: %d)\n", dir_fd);
         return 1;
     }
     
-    // Buffer para leer entradas de directorio
     char buffer[512];
     int32_t bytes_read = sys_read(dir_fd, buffer, sizeof(buffer));
     
@@ -505,35 +550,27 @@ int cmd_ls(int argc, char* argv[]) {
         return 1;
     }
     
-    // Procesar entradas de directorio (mejorado)
-    for (int i = 0; i < bytes_read; i += 32) { // Entradas de 32 bytes
-        // Verificar si la entrada es válida
+    for (int i = 0; i < bytes_read; i += 32) {
         if (buffer[i] == 0 || (uint8_t)buffer[i] == 0xE5) continue;
         
-        // Extraer nombre (8 caracteres) y extensión (3 caracteres)
-        char name[13] = {0}; // 8.3 formato + null terminator
+        char name[13] = {0};
         int name_idx = 0;
         
-        // Copiar nombre base (8 caracteres)
         for (int j = 0; j < 8; j++) {
-            if (buffer[i + j] == ' ') continue; // Ignorar espacios
+            if (buffer[i + j] == ' ') continue;
             name[name_idx++] = buffer[i + j];
         }
         
-        // Añadir punto si hay extensión
         if (buffer[i + 8] != ' ') {
             name[name_idx++] = '.';
-            
-            // Copiar extensión (3 caracteres)
             for (int j = 0; j < 3; j++) {
-                if (buffer[i + 8 + j] == ' ') continue; // Ignorar espacios
+                if (buffer[i + 8 + j] == ' ') continue;
                 name[name_idx++] = buffer[i + 8 + j];
             }
         }
         
-        name[name_idx] = '\0'; // Asegurar terminación null
+        name[name_idx] = '\0';
         
-        // Determinar si es directorio o archivo
         bool is_directory = (buffer[i + 11] & 0x10) != 0;
         uint32_t size = *(uint32_t*)(buffer + i + 28);
         
@@ -607,7 +644,6 @@ int cmd_find(int argc, char* argv[]) {
     
     printf("Searching for files matching '%s':\n", argv[1]);
     
-    // Implementación simplificada
     int32_t dir_fd = sys_open(".", OPEN_READ);
     if (dir_fd < 0) {
         printf("Error: Could not open directory (error: %d)\n", dir_fd);
@@ -625,21 +661,17 @@ int cmd_find(int argc, char* argv[]) {
     
     bool found = false;
     
-    // Procesar entradas de directorio
     for (int i = 0; i < bytes_read; i += 32) {
         char name[13] = {0};
         shell_memcpy(name, buffer + i, 11);
         
-        // Verificar si la entrada es válida
         if (name[0] == 0 || (uint8_t)name[0] == 0xE5) continue;
         
-        // Determinar si es directorio o archivo
         bool is_directory = (buffer[i + 11] & 0x10) != 0;
         
-        // Buscar coincidencia con el patrón
         if (shell_strstr(name, argv[1]) != NULL) {
             printf("%s %s\n", 
-                   is_directory ? "[DIR] " : "[FILE]",
+                   is_directory ? "[DIR] " : "[FILE] ",
                    name);
             found = true;
         }
@@ -1561,7 +1593,6 @@ const ShellCommandEntry shell_commands[] = {
     {"clear",           "Clear the screen",                                 cmd_clear},
     {"echo",            "Display a line of text",                           cmd_echo},
     {"version",         "Show OS version information",                      cmd_version},
-    {"history",         "Show command history",                             cmd_history}, // FIXME
     {"test",            "Run all syscall tests",                            cmd_test_all},
     {"heap_test",       "Run heap integrity test",                          cmd_test_heap_integrity},
     
@@ -1636,7 +1667,6 @@ const ShellCommandEntry* find_shell_command(const char* name) {
 
 /*
 TODO:
-- Arreglar cmd_history
 - cmd uptime no muestra nada
 - cmd_dmesg sea real
 - cmd_ps no muestra nada

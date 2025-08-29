@@ -29,7 +29,6 @@ int cmd_help(int argc, char* argv[]);
 int cmd_clear(int argc, char* argv[]);
 int cmd_echo(int argc, char* argv[]);
 int cmd_version(int argc, char* argv[]);
-int cmd_history(int argc, char* argv[]);
 
 // ============================================================================
 // INFORMACIÓN DEL SISTEMA

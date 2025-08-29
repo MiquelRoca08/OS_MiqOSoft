@@ -11,7 +11,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#define HISTORY_SIZE 50
 #define COMMAND_MAX_LEN 256
 
 // Definición de size_t si no está disponible
@@ -25,12 +24,6 @@ static char command_buffer[SHELL_BUFFER_SIZE];
 static int command_pos = 0;
 static int cursor_position = 0;  // Posición del cursor en la línea de comandos
 static bool shell_running = false;
-
-// Sistema de historial
-static char command_history[HISTORY_SIZE][COMMAND_MAX_LEN];
-static int history_count = 0;
-static int history_index = -1;  // -1 significa comando actual (no en historial)
-static char current_command_backup[COMMAND_MAX_LEN];  // Backup del comando actual
 
 // ============================================================================
 // FUNCIONES DE STRING PARA LA SHELL
@@ -82,93 +75,6 @@ char* shell_strncpy(char* dest, const char* src, int n) {
     while (n && (*d++ = *src++)) n--;
     while (n--) *d++ = '\0';
     return dest;
-}
-
-// ============================================================================
-// GESTIÓN DEL HISTORIAL
-// ============================================================================
-
-void history_add_command(const char* command) {
-    if (!command || shell_strlen(command) == 0) return;
-    
-    // No agregar comandos duplicados consecutivos
-    if (history_count > 0 && 
-        shell_strcmp(command_history[(history_count - 1) % HISTORY_SIZE], command) == 0) {
-        return;
-    }
-    
-    // Copiar comando al historial
-    shell_strncpy(command_history[history_count % HISTORY_SIZE], command, COMMAND_MAX_LEN - 1);
-    command_history[history_count % HISTORY_SIZE][COMMAND_MAX_LEN - 1] = '\0';
-    
-    history_count++;
-    history_index = -1;  // Reset índice de navegación
-}
-
-const char* history_get_previous(void) {
-    if (history_count == 0) return NULL;
-    
-    if (history_index == -1) {
-        // Primera vez navegando hacia atrás - guardar comando actual
-        shell_strncpy(current_command_backup, command_buffer, COMMAND_MAX_LEN - 1);
-        history_index = (history_count - 1) % HISTORY_SIZE;
-    } else {
-        // Navegar hacia atrás en el historial
-        if (history_count < HISTORY_SIZE) {
-            if (history_index > 0) history_index--;
-        } else {
-            history_index = (history_index - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-            if (history_index == (history_count % HISTORY_SIZE)) {
-                // Hemos llegado al comando más antiguo
-                history_index = (history_index + 1) % HISTORY_SIZE;
-                return command_history[history_index];
-            }
-        }
-    }
-    
-    return command_history[history_index];
-}
-
-const char* history_get_next(void) {
-    if (history_count == 0 || history_index == -1) return NULL;
-    
-    if (history_count < HISTORY_SIZE) {
-        if (history_index < history_count - 1) {
-            history_index++;
-            return command_history[history_index];
-        } else {
-            // Volver al comando actual
-            history_index = -1;
-            return current_command_backup;
-        }
-    } else {
-        history_index = (history_index + 1) % HISTORY_SIZE;
-        if (history_index == (history_count % HISTORY_SIZE)) {
-            // Volver al comando actual
-            history_index = -1;
-            return current_command_backup;
-        }
-        return command_history[history_index];
-    }
-}
-
-int shell_show_history(void) {
-    printf("Command history:\n");
-    
-    if (history_count == 0) {
-        printf("  (empty)\n");
-        return 0;
-    }
-    
-    int start = (history_count < HISTORY_SIZE) ? 0 : (history_count % HISTORY_SIZE);
-    int count = (history_count < HISTORY_SIZE) ? history_count : HISTORY_SIZE;
-    
-    for (int i = 0; i < count; i++) {
-        int idx = (start + i) % HISTORY_SIZE;
-        printf("  %3d: %s\n", i + 1, command_history[idx]);
-    }
-    
-    return 0;
 }
 
 // ============================================================================
@@ -246,11 +152,6 @@ void shell_init(void) {
     cursor_position = 0;
     shell_running = true;
     
-    // Inicializar historial
-    memset(command_history, 0, sizeof(command_history));
-    history_count = 0;
-    history_index = -1;
-    
     // IMPORTANTE: Activar el modo shell en el sistema de teclado
     keyboard_set_shell_mode(true);
     
@@ -298,7 +199,6 @@ void shell_run(void) {
             
             if (command_pos > 0) {
                 // Agregar al historial antes de procesar
-                history_add_command(command_buffer);
                 shell_process_command(command_buffer);
             }
             
@@ -341,20 +241,10 @@ void shell_run(void) {
             
         } else if (c == 0x01) {
             // UP - historial anterior
-            const char* prev_cmd = history_get_previous();
-            if (prev_cmd) {
-                shell_display_command(prev_cmd);
-                cursor_position = command_pos;
-            }
-            
+
         } else if (c == 0x02) {
             // DOWN - historial siguiente
-            const char* next_cmd = history_get_next();
-            if (next_cmd) {
-                shell_display_command(next_cmd);
-                cursor_position = command_pos;
-            }
-            
+
         } else if (c == 0x03) {
             // LEFT - mover cursor izquierda
             shell_move_cursor_left();

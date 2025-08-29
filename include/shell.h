@@ -34,12 +34,6 @@ void shell_redraw_screen(void);
 void shell_move_cursor_left(void);
 void shell_move_cursor_right(void);
 
-// Historial
-void history_add_command(const char* command);
-const char* history_get_previous(void);
-const char* history_get_next(void);
-int shell_show_history(void);
-
 // ============================================================================
 // FUNCIONES DE STRING PARA LA SHELL
 // ============================================================================
