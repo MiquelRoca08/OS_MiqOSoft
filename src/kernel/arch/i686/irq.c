@@ -4,7 +4,7 @@
 #include <io.h>
 #include <stddef.h>
 #include <arrays.h>
-#include "stdio.h"
+#include <stdio.h>
 #include <debug.h>
 
 #define PIC_REMAP_OFFSET        0x20

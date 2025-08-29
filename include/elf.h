@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include "mbr.h"
+#include <mbr.h>
 
 #define ELF_MAGIC ("\x7F" "ELF")
 

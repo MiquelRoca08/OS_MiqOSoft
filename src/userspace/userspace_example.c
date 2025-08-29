@@ -1,4 +1,4 @@
-#include "syscall.h"
+#include <syscall.h>
 
 // Ejemplo de programa de usuario que usa syscalls
 // (En un OS real, esto se compilaría separadamente como binario de usuario)

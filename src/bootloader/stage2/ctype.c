@@ -1,4 +1,4 @@
-#include "ctype.h"
+#include <ctype.h>
 
 bool islower(char chr)
 {

@@ -1,4 +1,4 @@
-#include "debug.h"
+#include <debug.h>
 #include <stdio.h>
 
 static const char* const g_LogSeverityColors[] =

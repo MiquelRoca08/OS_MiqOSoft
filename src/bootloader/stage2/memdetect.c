@@ -1,5 +1,5 @@
-#include "x86.h"
-#include "stdio.h"
+#include <x86.h>
+#include <stdio.h>
 #include <boot/bootparams.h>
 
 #define MAX_REGIONS 256

@@ -268,7 +268,7 @@ int cmd_echo(int argc, char* argv[]) {
 }
 
 int cmd_version(int argc, char* argv[]) {
-    printf("MiqOSoft Kernel v0.18.4\n");
+    printf("MiqOSoft Kernel v0.18.5\n");
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
@@ -360,7 +360,7 @@ int cmd_uptime(int argc, char* argv[]) {
     seconds %= 60;
     minutes %= 60;
     
-    printf("System has been up for: %u hours, %u minutes, %u seconds\n", hours, minutes, seconds);
+    printf("System has been up for: %u:%u:%u\n", hours, minutes, seconds);
 
     return 0;
 }

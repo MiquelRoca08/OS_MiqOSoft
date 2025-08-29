@@ -1,4 +1,4 @@
-#include "syscall.h"
+#include <syscall.h>
 #include <idt.h>
 #include <isr.h>
 #include <stdio.h>
@@ -89,13 +89,12 @@ static void vfs_init(void) {
 }
 
 // ============================================================================
-// IMPLEMENTACIONES DE SYSCALLS
+// IMPLEMENTACIONES DE SYSCALLS - CORREGIDAS
 // ============================================================================
 
 static int32_t sys_handler_exit(uint32_t code, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
     log_info("Syscall", "Process exit with code: %d", code);
     printf("Process exited with code: %d\n", code);
-
     return SYSCALL_OK;
 }
 
@@ -202,7 +201,7 @@ static int32_t sys_handler_open(uint32_t path_ptr, uint32_t flags, uint32_t arg3
             if (!virtual_files[i].in_use) {
                 file = &virtual_files[i];
                 strcpy(file->name, path);
-                file->data = sys_malloc(256); // Buffer inicial de 256 bytes
+                file->data = (char*)sys_handler_malloc(256, 0, 0, 0); // Buffer inicial de 256 bytes
                 if (!file->data) return SYSCALL_OUT_OF_MEMORY;
                 file->size = 0;
                 file->capacity = 256;
@@ -278,11 +277,11 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
     uint32_t needed_size = desc->position + count;
     if (needed_size > file->capacity) {
         uint32_t new_capacity = (needed_size + 255) & ~255; // Redondear a múltiplo de 256
-        char* new_data = sys_malloc(new_capacity);
+        char* new_data = (char*)sys_handler_malloc(new_capacity, 0, 0, 0);
         if (!new_data) return SYSCALL_OUT_OF_MEMORY;
         
         memcpy(new_data, file->data, file->size);
-        sys_free(file->data);
+        sys_handler_free((uint32_t)file->data, 0, 0, 0);
         file->data = new_data;
         file->capacity = new_capacity;
     }
@@ -297,26 +296,70 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
 }
 
 static int32_t sys_handler_getpid(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-
     return 1;
 }
 
-static long sys_handler_time(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
-    (void)a; (void)b; (void)c; (void)d;
-    return (long)sys_time();
+// CORREGIDA: Función TIME simplificada que NO llama a sys_time()
+static int32_t sys_handler_time(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
+    // Devolver directamente los ticks convertidos a milisegundos
+    uint64_t ticks = time_get_ticks();
+    return (int32_t)(ticks); // Devolver simplemente los ticks como tiempo
 }
 
-static long sys_handler_sleep(uint32_t ms, uint32_t b, uint32_t c, uint32_t d) {
-    (void)b; (void)c; (void)d;
-
-    uint32_t end = sys_time() + ms;
-    while (sys_time() < end) {
-        __asm__ volatile("sti; hlt; cli");
+// CORREGIDA: Función SLEEP simplificada sin bucle infinito
+static int32_t sys_handler_sleep(uint32_t ms, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
+    if (ms == 0) return SYSCALL_OK;
+    
+    log_info("Syscall", "Sleep called for %u ms", ms);
+    
+    // Obtener tiempo inicial
+    uint64_t start_ticks = time_get_ticks();
+    uint64_t target_ticks = start_ticks + ms; // Asumiendo que los ticks son en ms
+    
+    log_info("Syscall", "Start ticks: %llu, Target ticks: %llu", start_ticks, target_ticks);
+    
+    // Esperar activamente, pero permitir que se procesen interrupciones
+    uint32_t iteration = 0;
+    while (1) {
+        uint64_t current_ticks = time_get_ticks();
+        
+        // Handle timer wrap-around correctly
+        if (current_ticks >= target_ticks) {
+            break;
+        }
+        
+        // Simple delay para evitar uso excesivo de CPU
+        // Mantener interrupciones habilitadas para que el timer funcione
+        __asm__ volatile(
+            "sti\n\t"    // Habilitar interrupciones
+            "pause\n\t"  // Instrucción de pausa en x86
+            ::: "memory"
+        );
+        
+        // Add a small delay to yield more CPU time for interrupts
+        for (volatile int i = 0; i < 1000; i++) {}
+        
+        iteration++;
+        if (iteration % 100000 == 0) {  // Reduced from 1M to 100K iterations
+            log_debug("Syscall", "Sleep iteration %u, current ticks: %llu, target: %llu", 
+                     iteration, current_ticks, target_ticks);
+            
+            // Safety check to prevent infinite loop - increase timeout for longer sleeps
+            if (iteration > 100000000) {  // Increased from 50M to 100M iterations
+                log_warn("Syscall", "Sleep timeout - breaking infinite loop");
+                break;
+            }
+        }
     }
-    return 0;
+    
+    uint64_t end_ticks = time_get_ticks();
+    log_info("Syscall", "Sleep completed: start=%llu, end=%llu, diff=%llu", 
+             start_ticks, end_ticks, end_ticks - start_ticks);
+    
+    return SYSCALL_OK;
 }
-static int32_t sys_handler_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
 
+static int32_t sys_handler_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
     log_info("Syscall", "Yield requested");
     return SYSCALL_OK;
 }

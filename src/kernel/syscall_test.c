@@ -1,4 +1,4 @@
-#include "syscall.h"
+#include <syscall.h>
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>

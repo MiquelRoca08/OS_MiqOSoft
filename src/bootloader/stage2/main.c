@@ -1,15 +1,15 @@
 #include <stdint.h>
-#include "stdio.h"
-#include "x86.h"
-#include "disk.h"
-#include "fat.h"
-#include "memdefs.h"
-#include "memory.h"
-#include "mbr.h"
-#include "stdlib.h"
-#include "string.h"
-#include "elf.h"
-#include "memdetect.h"
+#include <stdio.h>
+#include <x86.h>
+#include <disk.h>
+#include <fat.h>
+#include <memdefs.h>
+#include <memory.h>
+#include <mbr.h>
+#include <stdlib.h>
+#include <string.h>
+#include <elf.h>
+#include <memdetect.h>
 #include <boot/bootparams.h>
 
 uint8_t* KernelLoadBuffer = (uint8_t*)MEMORY_LOAD_KERNEL;

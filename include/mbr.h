@@ -1,5 +1,5 @@
 #pragma once
-#include "disk.h"
+#include <disk.h>
 #include <stdbool.h>
 #include <stdint.h>
 

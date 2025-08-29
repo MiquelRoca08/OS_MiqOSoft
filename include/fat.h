@@ -1,6 +1,6 @@
 #pragma once
-#include "stdint.h"
-#include "mbr.h"
+#include <stdint.h>
+#include <mbr.h>
 
 typedef struct 
 {

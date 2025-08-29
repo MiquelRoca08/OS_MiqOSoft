@@ -1,7 +1,7 @@
-#include "stdint.h"
-#include "stdio.h"
-#include "disk.h"
-#include "fat.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <disk.h>
+#include <fat.h>
 
 int main(int argc, const char** argv)
 {
