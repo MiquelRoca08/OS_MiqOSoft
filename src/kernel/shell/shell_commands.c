@@ -1567,7 +1567,7 @@ const ShellCommandEntry shell_commands[] = {
     
     // Información del sistema
     {"memory",          "Show memory information",                          cmd_memory},
-    {"uptime",          "Show system uptime",                               cmd_uptime}, // FIXME
+    {"uptime",          "Show system uptime",                               cmd_uptime},
     {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
     {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
     {"lsmod",           "List loaded kernel modules",                       cmd_lsmod},
@@ -1576,14 +1576,14 @@ const ShellCommandEntry shell_commands[] = {
     {"lspci",           "List PCI devices",                                 cmd_lspci}, // FIXME
     
     // Sistema de archivos
-    {"ls",              "List directory contents",                          cmd_ls},
+    {"ls",              "List directory contents",                          cmd_ls}, // FIXME
     {"cat",             "Display file contents",                            cmd_cat}, // FIXME
     {"mkdir",           "Create directory",                                 cmd_mkdir}, // FIXME
     {"rm",              "Remove file or directory",                         cmd_rm}, // FIXME
     {"find",            "Find files by name pattern",                       cmd_find}, // FIXME
     {"grep",            "Search text in files",                             cmd_grep},
-    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME QUASI
-    {"create_file",     "Create a new file",                                cmd_create_file},
+    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME ALMOST
+    {"create_file",     "Create a new file",                                cmd_create_file}, // GET THE EDIT MODE OUT OF HERE --- GET OUT!!!
     {"edit",            "Edit a text file",                                 cmd_edit}, // FIXME
     
     // Hardware y debugging
@@ -1605,7 +1605,7 @@ const ShellCommandEntry shell_commands[] = {
     {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
     {"heap_info",       "Show heap information and test",                   cmd_heap_info},
     {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, // FIXME
-    {"sleep_test",      "Test sleep syscall",                               cmd_sleep_test}, // FIXME
+    {"sleep",           "Test sleep syscall",                               cmd_sleep_test},
     
     // Control del sistema
     {"reboot",          "Restart the system",                               cmd_reboot},
