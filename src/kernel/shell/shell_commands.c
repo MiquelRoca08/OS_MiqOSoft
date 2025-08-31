@@ -490,18 +490,16 @@ int cmd_lsmod(int argc, char* argv[]) {
     return 0;
 }
 
+extern void display_kernel_messages(void);
+
 int cmd_dmesg(int argc, char* argv[]) {
-    printf("Kernel messages (recent):\n");
-    printf("[0.000] Kernel started\n");
-    printf("[0.001] GDT initialized\n");
-    printf("[0.002] IDT initialized\n");
-    printf("[0.003] ISR handlers installed\n");
-    printf("[0.004] IRQ handlers installed\n");
-    printf("[0.005) PIC initialized\n");
-    printf("[0.006] Keyboard driver loaded\n");
-    printf("[0.007] System calls initialized\n");
-    printf("[0.008] Shell initialized\n");
-    printf("[0.009] System ready\n");
+    display_kernel_messages();
+
+    if (argc > 1 && shell_strcmp(argv[1], "--help") == 0) {
+        printf("\ndmesg - Display kernel boot messages\n");
+        printf("Shows messages logged during system startup\n");
+    }
+
     return 0;
 }
 
