@@ -1,13 +1,11 @@
 bits 16
 
-
 %define ENDL 0x0D, 0x0A
 
 %define fat12 1
 %define fat16 2
 %define fat32 3
 %define ext2  4
-
 
 ;
 ; FAT12 header

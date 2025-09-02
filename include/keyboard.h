@@ -5,23 +5,22 @@
 #include <isr.h>
 #include <io.h>
 
-// Puertos del teclado PS/2
+// PS/2 keyboard ports
 #define KEYBOARD_DATA_PORT    0x60
 #define KEYBOARD_STATUS_PORT  0x64
 #define KEYBOARD_COMMAND_PORT 0x64
 
-// Bits de estado
+// Status Bits
 #define KEYBOARD_OUTPUT_BUFFER_FULL 0x01
 #define KEYBOARD_INPUT_BUFFER_FULL  0x02
 
-// Teclas especiales
+// Special keys
 #define KEY_RELEASE 0x80
 #define KEY_SHIFT   0x2A
 #define KEY_ALTGR   0x38
-
 #define KEY_DEAD_KEY 0xFF
 
-// Funciones públicas
+// Public functions
 void redraw_input_line(void);
 void keyboard_init(void);
 void keyboard_handler(Registers* regs);

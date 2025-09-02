@@ -9,12 +9,12 @@
 #include <io.h>
 #include <time.h>
 
-// Tabla de handlers de syscalls
+// Syscall handler table
 static syscall_handler_t syscall_handlers[SYSCALL_COUNT];
 
 #define HEAP_START      0x400000    // 4MB
 #define HEAP_SIZE       0x100000    // 1MB
-#define BLOCK_SIZE      32          // Tamaño mínimo de bloque
+#define BLOCK_SIZE      32          // Minimum block size
 
 typedef struct heap_block {
     uint32_t size;
@@ -25,7 +25,7 @@ typedef struct heap_block {
 static heap_block_t* heap_start = NULL;
 static uint32_t heap_initialized = 0;
 
-// Inicializar el heap simple
+// Initialize the simple heap
 static void heap_init(void) {
     if (heap_initialized) return;
     
@@ -38,7 +38,7 @@ static void heap_init(void) {
     log_info("Syscall", "Heap initialized at 0x%08X, size: %d bytes", HEAP_START, HEAP_SIZE);
 }
 
-// Sistema de archivos virtual simple (para las syscalls de archivos)
+// Simple virtual file system (for file syscalls)
 #define MAX_OPEN_FILES  32
 #define MAX_FILENAME    64
 
@@ -62,14 +62,14 @@ static vfile_t virtual_files[MAX_OPEN_FILES];
 static file_descriptor_t file_descriptors[MAX_OPEN_FILES];
 static uint32_t fs_initialized = 0;
 
-// Inicializar el sistema de archivos virtual
+// Initialize the virtual file system
 static void vfs_init(void) {
     if (fs_initialized) return;
     
     memset(virtual_files, 0, sizeof(virtual_files));
     memset(file_descriptors, 0, sizeof(file_descriptors));
     
-    // Crear algunos archivos por defecto
+    // Create some default files
     strcpy(virtual_files[0].name, "welcome.txt");
     virtual_files[0].data = "Welcome to MiqOSoft!\nThis is a virtual file system.\n";
     virtual_files[0].size = strlen(virtual_files[0].data);
@@ -88,9 +88,9 @@ static void vfs_init(void) {
     log_info("Syscall", "Virtual file system initialized");
 }
 
-// ============================================================================
-// IMPLEMENTACIONES DE SYSCALLS - CORREGIDAS
-// ============================================================================
+//
+// Syscall Implementations
+//
 
 static int32_t sys_handler_exit(uint32_t code, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
     log_info("Syscall", "Process exit with code: %d", code);
@@ -133,16 +133,16 @@ static int32_t sys_handler_malloc(uint32_t size, uint32_t arg2, uint32_t arg3, u
     
     if (size == 0) return (int32_t)NULL;
     
-    // Alinear al tamaño de bloque
+    // Align to block size
     size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
     
     heap_block_t* current = heap_start;
     while (current) {
         if (current->is_free && current->size >= size) {
-            // Encontramos un bloque libre suficientemente grande
+            // We found a free block large enough
             current->is_free = 0;
             
-            // Si el bloque es mucho más grande, dividirlo
+            // If the block is much larger, split it
             if (current->size > size + sizeof(heap_block_t) + BLOCK_SIZE) {
                 heap_block_t* new_block = (heap_block_t*)((uint8_t*)current + sizeof(heap_block_t) + size);
                 new_block->size = current->size - size - sizeof(heap_block_t);
@@ -157,7 +157,7 @@ static int32_t sys_handler_malloc(uint32_t size, uint32_t arg2, uint32_t arg3, u
         current = current->next;
     }
     
-    return (int32_t)NULL; // No hay memoria disponible
+    return (int32_t)NULL; // No memory available
 }
 
 static int32_t sys_handler_free(uint32_t ptr, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
@@ -166,7 +166,7 @@ static int32_t sys_handler_free(uint32_t ptr, uint32_t arg2, uint32_t arg3, uint
     heap_block_t* block = (heap_block_t*)((uint8_t*)ptr - sizeof(heap_block_t));
     block->is_free = 1;
     
-    // Intentar fusionar con bloques adyacentes libres
+    // Attempt to merge with free adjacent blocks
     heap_block_t* current = heap_start;
     while (current && current->next) {
         if (current->is_free && current->next->is_free) {
@@ -186,7 +186,7 @@ static int32_t sys_handler_open(uint32_t path_ptr, uint32_t flags, uint32_t arg3
     
     vfs_init();
     
-    // Buscar el archivo
+    // Find the file
     vfile_t* file = NULL;
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (virtual_files[i].in_use && strcmp(virtual_files[i].name, path) == 0) {
@@ -195,13 +195,13 @@ static int32_t sys_handler_open(uint32_t path_ptr, uint32_t flags, uint32_t arg3
         }
     }
     
-    // Si no existe y tenemos flag CREATE, crearlo
+    // If it does not exist and we have CREATE flag, create it
     if (!file && (flags & OPEN_CREATE)) {
         for (int i = 0; i < MAX_OPEN_FILES; i++) {
             if (!virtual_files[i].in_use) {
                 file = &virtual_files[i];
                 strcpy(file->name, path);
-                file->data = (char*)sys_handler_malloc(256, 0, 0, 0); // Buffer inicial de 256 bytes
+                file->data = (char*)sys_handler_malloc(256, 0, 0, 0); // Initial buffer of 256 bytes
                 if (!file->data) return SYSCALL_OUT_OF_MEMORY;
                 file->size = 0;
                 file->capacity = 256;
@@ -214,8 +214,8 @@ static int32_t sys_handler_open(uint32_t path_ptr, uint32_t flags, uint32_t arg3
     
     if (!file) return SYSCALL_NOT_FOUND;
     
-    // Buscar descriptor libre
-    for (int i = 3; i < MAX_OPEN_FILES; i++) { // 0,1,2 reservados para stdin,stdout,stderr
+    // Search for free descriptor
+    for (int i = 3; i < MAX_OPEN_FILES; i++) { // 0,1,2 reserved for stdin,stdout,stderr
         if (!file_descriptors[i].in_use) {
             file_descriptors[i].file = file;
             file_descriptors[i].position = (flags & OPEN_APPEND) ? file->size : 0;
@@ -254,7 +254,7 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
     
     const char* buffer = (const char*)buffer_ptr;
     
-    // Casos especiales para stdout/stderr
+    // Special cases for stdout/stderr
     if (fd == 1 || fd == 2) {
         for (uint32_t i = 0; i < count; i++) {
             putc(buffer[i]);
@@ -273,10 +273,10 @@ static int32_t sys_handler_write(uint32_t fd, uint32_t buffer_ptr, uint32_t coun
         return SYSCALL_PERMISSION_DENIED;
     }
     
-    // Verificar si necesitamos expandir el buffer
+    // Check if we need to expand the buffer
     uint32_t needed_size = desc->position + count;
     if (needed_size > file->capacity) {
-        uint32_t new_capacity = (needed_size + 255) & ~255; // Redondear a múltiplo de 256
+        uint32_t new_capacity = (needed_size + 255) & ~255; // Round to a multiple of 256
         char* new_data = (char*)sys_handler_malloc(new_capacity, 0, 0, 0);
         if (!new_data) return SYSCALL_OUT_OF_MEMORY;
         
@@ -299,26 +299,23 @@ static int32_t sys_handler_getpid(uint32_t arg1, uint32_t arg2, uint32_t arg3, u
     return 1;
 }
 
-// CORREGIDA: Función TIME simplificada que NO llama a sys_time()
 static int32_t sys_handler_time(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
-    // Devolver directamente los ticks convertidos a milisegundos
     uint64_t ticks = time_get_ticks();
-    return (int32_t)(ticks); // Devolver simplemente los ticks como tiempo
+    return (int32_t)(ticks);
 }
 
-// CORREGIDA: Función SLEEP simplificada sin bucle infinito
 static int32_t sys_handler_sleep(uint32_t ms, uint32_t arg2, uint32_t arg3, uint32_t arg4) {
     if (ms == 0) return SYSCALL_OK;
     
     log_info("Syscall", "Sleep called for %u ms", ms);
     
-    // Obtener tiempo inicial
+    // Get initial time
     uint64_t start_ticks = time_get_ticks();
-    uint64_t target_ticks = start_ticks + ms; // Asumiendo que los ticks son en ms
+    uint64_t target_ticks = start_ticks + ms; // Assuming ticks are in ms
     
     log_info("Syscall", "Start ticks: %llu, Target ticks: %llu", start_ticks, target_ticks);
     
-    // Esperar activamente, pero permitir que se procesen interrupciones
+    // Actively wait, but allow interrupts to be processed
     uint32_t iteration = 0;
     while (1) {
         uint64_t current_ticks = time_get_ticks();
@@ -328,11 +325,11 @@ static int32_t sys_handler_sleep(uint32_t ms, uint32_t arg2, uint32_t arg3, uint
             break;
         }
         
-        // Simple delay para evitar uso excesivo de CPU
-        // Mantener interrupciones habilitadas para que el timer funcione
+        // Simple delay to avoid excessive CPU usage
+        // Keep interrupts enabled so the timer works
         __asm__ volatile(
-            "sti\n\t"    // Habilitar interrupciones
-            "pause\n\t"  // Instrucción de pausa en x86
+            "sti\n\t"    // Enable interruptions
+            "pause\n\t"  // Pause instruction in x86
             ::: "memory"
         );
         
@@ -364,9 +361,9 @@ static int32_t sys_handler_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3, ui
     return SYSCALL_OK;
 }
 
-// ============================================================================
-// MANEJADOR PRINCIPAL DE SYSCALLS
-// ============================================================================
+//
+// Main Syscall Handler
+//
 
 static void syscall_handler(Registers* regs) {
     uint32_t syscall_num = regs->eax;
@@ -377,7 +374,7 @@ static void syscall_handler(Registers* regs) {
     
     int32_t result = syscall_dispatch(syscall_num, arg1, arg2, arg3, arg4);
     
-    // Retornar resultado en EAX
+    // Return result in EAX
     regs->eax = result;
 }
 
@@ -411,10 +408,10 @@ int32_t syscall_invoke(syscall_number_t num, uint32_t arg1, uint32_t arg2, uint3
 void syscall_initialize(void) {
     log_info("Syscall", "Initializing system call interface...");
     
-    // Limpiar tabla de handlers
+    // Clear handler table
     memset(syscall_handlers, 0, sizeof(syscall_handlers));
     
-    // Registrar handlers básicos
+    // Register basic handlers
     syscall_register_handler(SYSCALL_EXIT, sys_handler_exit);
     syscall_register_handler(SYSCALL_PRINT, sys_handler_print);
     syscall_register_handler(SYSCALL_READ, sys_handler_read);
@@ -428,10 +425,10 @@ void syscall_initialize(void) {
     syscall_register_handler(SYSCALL_SLEEP, sys_handler_sleep);
     syscall_register_handler(SYSCALL_YIELD, sys_handler_yield);
     
-    // Instalar manejador de interrupción para syscalls
+    // Install interrupt handler for syscalls
     i686_ISR_RegisterHandler(SYSCALL_INTERRUPT, syscall_handler);
     
-    // Inicializar subsistemas
+    // Initialize subsystems
     heap_init();
     vfs_init();
     

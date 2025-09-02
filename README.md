@@ -258,9 +258,8 @@ All system calls are accessible from both kernel and user space through the same
 │   │   ├── drivers/
 │   │   ├── hal/
 │   │   └── util/
-│   ├── libs/
-│   │   └── core/
-│   └── userspace/
+│   └── libs/
+│       └── core/
 ├── tools/
 ├── build_scripts/
 ├── image/

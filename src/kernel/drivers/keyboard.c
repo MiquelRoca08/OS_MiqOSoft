@@ -104,7 +104,7 @@ static int caps_lock = 0;
 static int extended_key = 0;
 static uint8_t dead_key_state = DEAD_NONE;
 
-// Buffer circular para teclado
+// Circular keyboard buffer
 static char key_buffer[KEYBOARD_BUFFER_SIZE];
 static int kb_head = 0;
 static int kb_tail = 0;
@@ -142,7 +142,7 @@ static const KeyMapping keymap[] = {
     {0x17, 'i', 'I', 0, false},
     {0x18, 'o', 'O', 0, false},
     {0x19, 'p', 'P', 0, false},
-    {0x1A, '`', '^', '[', true},   // Dead key: ` (grave) y ^ (circumflex), AltGr = [
+    // Dead key: ` (grave) and ^ (circumflex), AltGr = [
     {0x1B, '+', '*', ']', false},  // AltGr = ]
     {0x1C, '\n', '\n', '\n', false},
     {0x1E, 'a', 'A', 0, false},
@@ -155,9 +155,9 @@ static const KeyMapping keymap[] = {
     {0x25, 'k', 'K', 0, false},
     {0x26, 'l', 'L', 0, false},
     {0x27, CHAR_n_TILDE, CHAR_N_TILDE, 0, false},
-    {0x28, 0, 0, '{', true},       // Dead key: ´ (acute) y ¨ (dieresis), AltGr = {
+    // Dead key: ´ (acute) and ¨ (dieresis), AltGr = {
     {0x29, CHAR_DEGREE, CHAR_FEMININE, '\\', false},
-    {0x2B, '\x87', '\x80', '}', false}, // ç y Ç, AltGr = }
+    // ç and Ç, AltGr = }
     {0x56, '<', '>', 0, false},
     {0x2C, 'z', 'Z', 0, false},
     {0x2D, 'x', 'X', 0, false},
@@ -173,7 +173,7 @@ static const KeyMapping keymap[] = {
     {0x39, ' ', ' ', ' ', false}
 };
 
-// Composiciones para dead keys
+// Dead Keys
 typedef struct {
     uint8_t dead_type;
     char base_char;
@@ -233,7 +233,7 @@ void keyboard_init(void) {
 }
 
 char keyboard_get_scancode(void) {
-    // Espera hasta que el buffer de salida tenga datos
+    // Wait until the output buffer has data
     while (!(i686_inb(KEYBOARD_STATUS_PORT) & KEYBOARD_OUTPUT_BUFFER_FULL));
     return i686_inb(KEYBOARD_DATA_PORT);
 }
@@ -279,17 +279,17 @@ static char apply_caps_lock(char ascii) {
     return ascii;
 }
 
-// Buffer circular para teclado
+// Circular keyboard buffer
 bool keyboard_buffer_push(char c) {
     int next = (kb_head + 1) % KEYBOARD_BUFFER_SIZE;
-    if (next == kb_tail) return false; // buffer lleno
+    if (next == kb_tail) return false; // Full Buffer
     key_buffer[kb_head] = c;
     kb_head = next;
     return true;
 }
 
 bool keyboard_buffer_pop(char* c) {
-    if (kb_head == kb_tail) return false; // vacío
+    if (kb_head == kb_tail) return false; // Empty
     *c = key_buffer[kb_tail];
     kb_tail = (kb_tail + 1) % KEYBOARD_BUFFER_SIZE;
     return true;
@@ -299,7 +299,7 @@ bool keyboard_buffer_empty(void) {
     return kb_head == kb_tail;
 }
 
-// Redibuja la línea actual en pantalla
+// Redraw the current line on screen
 void redraw_input_line() {
     int y = cursor_line;
     for (int x = 0; x < LINE_LENGTH; x++) {
@@ -313,10 +313,10 @@ void redraw_input_line() {
     VGA_setcursor(g_ScreenX, g_ScreenY);
 }
 
-// Maneja la tecla delete (suprimir) en línea actual
+// Handle the delete key (suppress) in current line
 void handle_delete_key() {
     int len = line_lengths[cursor_line];
-    if (cursor_pos >= len) return; // nada que borrar
+    if (cursor_pos >= len) return; // Nothing to delete
 
     for (int i = cursor_pos; i < len - 1; i++) {
         input_lines[cursor_line][i] = input_lines[cursor_line][i + 1];
@@ -326,7 +326,7 @@ void handle_delete_key() {
     redraw_input_line();
 }
 
-// Avanza a la siguiente línea al pulsar Enter
+// Advance to the next line when Enter is pressed
 void handle_enter_multiline() {
     if (cursor_line < MAX_LINES - 1) {
         cursor_line++;
@@ -340,7 +340,7 @@ void handle_enter_multiline() {
     redraw_input_line();
 }
 
-// Borrar carácter anterior con backspace
+// Delete previous character with backspace
 void backspace_multiline() {
     if (cursor_pos == 0) return;
 
@@ -353,9 +353,9 @@ void backspace_multiline() {
     redraw_input_line();
 }
 
-// Insertar carácter en la línea actual
+// Insert character in the current line
 void insert_char_multiline(char ascii) {
-    if (line_lengths[cursor_line] >= LINE_LENGTH - 1) return; // línea llena
+    if (line_lengths[cursor_line] >= LINE_LENGTH - 1) return; // Line full
 
     for (int i = line_lengths[cursor_line]; i > cursor_pos; i--) {
         input_lines[cursor_line][i] = input_lines[cursor_line][i - 1];
@@ -366,7 +366,7 @@ void insert_char_multiline(char ascii) {
     redraw_input_line();
 }
 
-// Procesa el buffer de teclado (mostrar texto en pantalla)
+// Process keyboard buffer (display text on screen)
 void keyboard_handler(Registers* regs) {
     uint8_t scancode = keyboard_get_scancode();
 
@@ -380,24 +380,24 @@ void keyboard_handler(Registers* regs) {
             case KEY_ALTGR:
                 altgr_pressed = 1;
                 return;
-            case 0xB8:  // AltGr soltado
+            case 0xB8:  // Released AltGr
                 altgr_pressed = 0;
                 return;
             case KEY_UP:
-                // Enviar código especial para historial arriba
-                keyboard_buffer_push(0x01);  // Código especial para UP
+                // Send special code for history up
+                keyboard_buffer_push(0x01);
                 return;
             case KEY_DOWN:
-                // Enviar código especial para historial abajo
-                keyboard_buffer_push(0x02);  // Código especial para DOWN
+                // Send special code for history down
+                keyboard_buffer_push(0x02);
                 return;
             case KEY_LEFT:
-                // Código especial para mover cursor izquierda
-                keyboard_buffer_push(0x03);  // Código especial para LEFT
+                // Special code to move cursor left
+                keyboard_buffer_push(0x03);
                 return;
             case KEY_RIGHT:
-                // Código especial para mover cursor derecha
-                keyboard_buffer_push(0x04);  // Código especial para RIGHT
+                // Special code to move cursor right
+                keyboard_buffer_push(0x04);
                 return;
             case KEY_DELETE:
                 handle_delete_key();
@@ -406,7 +406,7 @@ void keyboard_handler(Registers* regs) {
         return;
     }
 
-    // Resto del código existente sin cambios...
+    // Rest of the existing code without changes...
     if (scancode & KEY_RELEASE) {
         uint8_t key = scancode & ~KEY_RELEASE;
         if (key == KEY_SHIFT || key == KEY_RSHIFT) shift_pressed = 0;
@@ -477,15 +477,15 @@ void keyboard_set_caps_lock(int state) {
 
 static bool shell_mode = false;
 
-// Función para activar/desactivar el modo shell
+// Function to enable/disable shell mode
 void keyboard_set_shell_mode(bool enabled) {
     shell_mode = enabled;
 }
 
-// Modificar la función keyboard_process_buffer para no hacer nada en modo shell:
+// Modify the keyboard_process_buffer function to do nothing in shell mode:
 void keyboard_process_buffer(void) {
     if (shell_mode) {
-        return; // No procesar en modo shell - la shell maneja directamente el buffer
+        return; // Do not process in shell mode - the shell handles the buffer directly
     }
     
     char c;

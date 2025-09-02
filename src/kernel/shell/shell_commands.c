@@ -9,29 +9,29 @@
 #include <io.h>
 #include <x86.h>
 
-// ============================================================================
-// DECLARACIONES EXTERNAS
-// ============================================================================
+//
+// External Declarations
+//
 
-// Funciones de shell.c que necesitamos
+// Functions from shell.c
 extern int shell_strlen(const char* str);
 extern int shell_strcmp(const char* s1, const char* s2);
 extern char* shell_strchr(const char* str, int c);
 extern char* shell_strstr(const char* haystack, const char* needle);
 extern char* shell_strncpy(char* dest, const char* src, int n);
 
-// Funciones de syscall_test.c
+// Functions from syscall_test.c
 extern void syscall_run_all_tests(void);
 extern void syscall_test_heap_integrity(void);
 
-// Funciones del subsistema de tiempo
+// Functions from the time subsystem
 extern uint32_t sys_time(void);
 
-// ============================================================================
-// UTILIDADES AUXILIARES
-// ============================================================================
+//
+// Auxiliary Utility
+//
 
-// Implementación simple de memcpy
+// Simple memcpy implementation
 void* shell_memcpy(void* dest, const void* src, size_t n) {
     char* d = (char*)dest;
     const char* s = (const char*)src;
@@ -41,7 +41,7 @@ void* shell_memcpy(void* dest, const void* src, size_t n) {
     return dest;
 }
 
-// Implementación simple de memset 
+// Simple memset implementation
 void* shell_memset(void* s, int c, size_t n) {
     unsigned char* p = s;
     while (n--) {
@@ -50,7 +50,7 @@ void* shell_memset(void* s, int c, size_t n) {
     return s;
 }
 
-// Conversión de entero a cadena
+// Integer to string conversion
 void format_number(char* buffer, int num) {
     if (num == 0) {
         buffer[0] = '0';
@@ -142,7 +142,7 @@ int shell_snprintf(char* str, size_t size, const char* format, ...) {
     return written;
 }
 
-// Función auxiliar para conversión hexadecimal
+// Auxiliary function for hexadecimal conversion
 uint32_t hex_str_to_int(const char* hex_str) {
     uint32_t result = 0;
     const char* hex = hex_str;
@@ -160,7 +160,7 @@ uint32_t hex_str_to_int(const char* hex_str) {
     return result;
 }
 
-// Función auxiliar para conversión decimal
+// Auxiliary function for decimal conversion
 uint32_t dec_str_to_int(const char* dec_str) {
     uint32_t result = 0;
     while (*dec_str >= '0' && *dec_str <= '9') {
@@ -170,9 +170,9 @@ uint32_t dec_str_to_int(const char* dec_str) {
     return result;
 }
 
-// ============================================================================
-// FUNCIÓN AUXILIAR PARA CATEGORIZACIÓN DE COMANDOS
-// ============================================================================
+//
+// Auxiliary Function For Command Categorization
+//
 
 const char* get_command_category(const char* name) {
     // Categorías para organizar los comandos
@@ -186,20 +186,19 @@ const char* get_command_category(const char* name) {
         "Network"
     };
     
-    // Comandos básicos
+    // Basic Commands
     if (shell_strcmp(name, "help") == 0 || shell_strcmp(name, "clear") == 0 ||
         shell_strcmp(name, "echo") == 0 || shell_strcmp(name, "version") == 0 ||
         shell_strcmp(name, "test") == 0 || shell_strcmp(name, "heap_test") == 0) {
         return categories[0];
     }
-    // Información del sistema
+    // System Information
     else if (shell_strcmp(name, "memory") == 0 || shell_strcmp(name, "uptime") == 0 ||
              shell_strcmp(name, "cpuinfo") == 0 || shell_strcmp(name, "cpuid") == 0 ||
-             shell_strcmp(name, "lsmod") == 0 || shell_strcmp(name, "dmesg") == 0 ||
-             shell_strcmp(name, "ps") == 0 || shell_strcmp(name, "lspci") == 0) {
+             shell_strcmp(name, "lsmod") == 0 || shell_strcmp(name, "dmesg") == 0) {
         return categories[1];
     }
-    // Sistema de archivos
+    // File System
     else if (shell_strcmp(name, "ls") == 0 || shell_strcmp(name, "cat") == 0 ||
              shell_strcmp(name, "mkdir") == 0 || shell_strcmp(name, "rm") == 0 ||
              shell_strcmp(name, "find") == 0 || shell_strcmp(name, "grep") == 0 ||
@@ -207,34 +206,30 @@ const char* get_command_category(const char* name) {
              shell_strcmp(name, "edit") == 0) {
         return categories[2];
     }
-    // Hardware y debugging
+    // Hardware & Debug
     else if (shell_strcmp(name, "memtest") == 0 || shell_strcmp(name, "ports") == 0 ||
              shell_strcmp(name, "interrupt") == 0 || shell_strcmp(name, "hexdump") == 0 ||
              shell_strcmp(name, "keytest") == 0 || shell_strcmp(name, "benchmark") == 0 ||
-             shell_strcmp(name, "registers") == 0 || shell_strcmp(name, "stack") == 0) {
+             shell_strcmp(name, "registers") == 0) {
         return categories[3];
     }
-    // System calls
+    // System Calls
     else if (shell_strcmp(name, "syscall_test") == 0 || shell_strcmp(name, "malloc_test") == 0 ||
              shell_strcmp(name, "heap_info") == 0 || shell_strcmp(name, "syscall_info") == 0 ||
              shell_strcmp(name, "sleep") == 0) {
         return categories[4];
     }
-    // Control del sistema
+    // System Control
     else if (shell_strcmp(name, "reboot") == 0 || shell_strcmp(name, "panic") == 0) {
         return categories[5];
     }
-    // Red
-    else if (shell_strcmp(name, "ping") == 0 || shell_strcmp(name, "netstat") == 0) {
-        return categories[6];
-    }
-    // Categoría por defecto
+    // Default category
     return "Other Commands";
 }
 
-// ============================================================================
-// COMANDOS BÁSICOS DE SISTEMA
-// ============================================================================
+//
+// Basic System Commands
+//
 
 extern const ShellCommandEntry shell_commands[];
 
@@ -255,11 +250,11 @@ int cmd_help(int argc, char* argv[]) {
     const int LINES_PER_PAGE = 20;
     int line_count = 0;
     
-    // Mostrar comandos por categoría
+        // Show commands by category
     for (int cat = 0; cat < 7; cat++) {
         bool category_has_commands = false;
         
-        // Primera pasada: verificar si la categoría tiene comandos
+        // First pass: check if the category has commands
         for (int i = 0; shell_commands[i].name != NULL; i++) {
             if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
                 category_has_commands = true;
@@ -274,13 +269,13 @@ int cmd_help(int argc, char* argv[]) {
         printf("[%s]\n", categories[cat]);
         line_count++;
         
-        // Segunda pasada: mostrar comandos de esta categoría
+        // Second pass: show commands of this category
         for (int i = 0; shell_commands[i].name != NULL; i++) {
             if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
                 printf("  %s - %s\n", shell_commands[i].name, shell_commands[i].description);
                 line_count++;
                 
-                // Paginación
+                // Pagination
                 if (line_count >= LINES_PER_PAGE) {
                     printf("\nPress any key to continue (q to quit)...");
                     char c;
@@ -341,24 +336,24 @@ int cmd_test_heap_integrity(int argc, char* argv[]) {
     return 0;
 }
 
-// ============================================================================
-// INFORMACIÓN DEL SISTEMA
-// ============================================================================
+//
+// System Information
+//
 
 int cmd_memory(int argc, char* argv[]) {
     printf("Memory Information:\n");
     printf("  Kernel Memory Range: 0x100000 - 0x200000 (1MB)\n");
     
-    // Constantes del sistema de memoria (obtenidas del VFS/syscalls)
-    const uint32_t HEAP_START = 0x400000;    // 4MB
-    const uint32_t HEAP_SIZE = 0x100000;     // 1MB
-    const uint32_t BLOCK_SIZE = 32;          // Tamaño mínimo de bloque
+    // Memory system constants (obtained from VFS/syscalls)
+    const uint32_t HEAP_START = 0x400000    // 4MB
+    const uint32_t HEAP_SIZE = 0x100000     // 1MB
+    const uint32_t BLOCK_SIZE = 32          // Minimum block size
     
     printf("  Heap Start: 0x%08X (%dMB)\n", HEAP_START, HEAP_START / 1048576);
     printf("  Heap Size: %dKB (%d bytes)\n", HEAP_SIZE / 1024, HEAP_SIZE);
     printf("  Block Size: %d bytes\n", BLOCK_SIZE);
     
-    // Realizar pruebas de asignación para verificar el estado actual del heap
+    // Perform allocation tests to verify the current heap state
     void* test_ptr1 = sys_malloc(1024);
     void* test_ptr2 = sys_malloc(2048);
     void* test_ptr3 = sys_malloc(4096);
@@ -371,7 +366,7 @@ int cmd_memory(int argc, char* argv[]) {
         printf("  Test allocation 2: 0x%08X (2KB)\n", (uint32_t)test_ptr2);
         printf("  Test allocation 3: 0x%08X (4KB)\n", (uint32_t)test_ptr3);
         
-        // Calcular espacio aproximado entre bloques
+    // Calculate approximate space between blocks
         uint32_t block_overhead = 0;
         if (test_ptr2 > test_ptr1) {
             block_overhead = (uint32_t)test_ptr2 - (uint32_t)test_ptr1 - 1024;
@@ -379,7 +374,7 @@ int cmd_memory(int argc, char* argv[]) {
         
         printf("  Block overhead: ~%d bytes\n", block_overhead);
         
-        // Liberar memoria de prueba
+    // Free test memory
         sys_free(test_ptr1);
         sys_free(test_ptr2);
         sys_free(test_ptr3);
@@ -389,7 +384,7 @@ int cmd_memory(int argc, char* argv[]) {
         printf("  Memory test failed - could not allocate test blocks\n");
         printf("  Heap may be full or corrupted\n");
         
-        // Liberar cualquier asignación exitosa
+        // Release any successful allocation
         if (test_ptr1) sys_free(test_ptr1);
         if (test_ptr2) sys_free(test_ptr2);
         if (test_ptr3) sys_free(test_ptr3);
@@ -490,24 +485,20 @@ int cmd_lsmod(int argc, char* argv[]) {
     return 0;
 }
 
-
 extern uint32_t sys_time(void);
 
-// Funciones del sistema dmesg - AGREGAR ESTA LÍNEA
+// Dmesg system functions
 extern void kernel_add_message(char level, const char* component, const char* message);
-
-// Funciones de dmesg
 extern void display_kernel_messages(void);
 extern void dmesg_clear(void);
 extern void dmesg_stats(void);
 
-// Versión simplificada del comando dmesg
+// Simplified version of the dmesg command
 int cmd_dmesg(int argc, char* argv[]) {
     if (argc == 1) {
-        // Mostrar mensajes
+        // Show messages
         display_kernel_messages();
     } else if (argc == 2) {
-        // Verificar opciones usando la función shell_strcmp que ya tienes
         if (shell_strcmp(argv[1], "--help") == 0 || shell_strcmp(argv[1], "-h") == 0) {
             printf("dmesg - Display kernel boot messages\n");
             printf("Usage:\n");
@@ -524,7 +515,7 @@ int cmd_dmesg(int argc, char* argv[]) {
             dmesg_stats();
         }
         else if (shell_strcmp(argv[1], "--test") == 0) {
-            // Agregar mensaje de prueba
+        // Add test message
             kernel_add_message('T', "test", "This is a test message from shell");
             printf("Test message added to dmesg buffer\n");
         }
@@ -541,30 +532,9 @@ int cmd_dmesg(int argc, char* argv[]) {
     return 0;
 }
 
-int cmd_ps(int argc, char* argv[]) {
-    printf("Process information:\n");
-    printf("  %-5s %-5s %-10s %-15s %s\n", "PID", "PPID", "STATE", "NAME", "DESCRIPTION");
-    printf("  %-5s %-5s %-10s %-15s %s\n", "---", "----", "-----", "----", "-----------");
-    printf("  %-5s %-5s %-10s %-15s %s\n", "0", "-", "running", "kernel", "Kernel process");
-    printf("  %-5s %-5s %-10s %-15s %s\n", "1", "0", "running", "shell", "Command shell");
-    printf("\nNote: Full process management not implemented\n");
-    return 0;
-}
-
-int cmd_lspci(int argc, char* argv[]) {
-    printf("PCI device enumeration not implemented.\n");
-    printf("In a full implementation, this would show:\n");
-    printf("  - Host bridge\n");
-    printf("  - VGA controller\n");
-    printf("  - Network controllers\n");
-    printf("  - Storage controllers\n");
-    printf("  - USB controllers\n");
-    return 0;
-}
-
-// ============================================================================
-// SISTEMA DE ARCHIVOS VIRTUAL
-// ============================================================================
+//
+// Virtual File System
+//
 
 int cmd_ls(int argc, char* argv[]) {
     printf("Directory listing:\n");
@@ -761,7 +731,7 @@ int cmd_grep(int argc, char* argv[]) {
         }
     }
     
-    // Procesar la última línea si no termina en \n
+    // Process the last line if it does not end in \n
     if (line_pos > 0) {
         line[line_pos] = '\0';
         if (shell_strstr(line, argv[1]) != NULL) {
@@ -818,7 +788,7 @@ int cmd_wc(int argc, char* argv[]) {
         }
     }
     
-    // Contar la última palabra si el archivo no termina con espacio
+    // Count the last word if the file does not end with a space
     if (in_word) {
         words++;
     }
@@ -835,9 +805,9 @@ int cmd_wc(int argc, char* argv[]) {
     return 0;
 }
 
-// ============================================================================
-// COMANDOS DE HARDWARE Y DEBUGGING
-// ============================================================================
+//
+// Hardware & Debug Commands
+//
 
 int cmd_memtest(int argc, char* argv[]) {
     printf("Basic memory test...\n");
@@ -851,12 +821,12 @@ int cmd_memtest(int argc, char* argv[]) {
     for (int p = 0; p < pattern_count; p++) {
         printf("  Testing pattern 0x%02X... ", patterns[p]);
         
-        // Escribir patrón
+        // Write pattern
         for (int i = 0; i < test_size; i++) {
             test_ptr[i] = patterns[p];
         }
         
-        // Verificar patrón
+        // Verify pattern
         bool success = true;
         for (int i = 0; i < test_size; i++) {
             if (test_ptr[i] != patterns[p]) {
@@ -991,7 +961,7 @@ int cmd_keytest(int argc, char* argv[]) {
     while (1) {
         keyboard_process_buffer();
         
-        if (i686_inb(0x64) & 0x01) { // Datos disponibles
+        if (i686_inb(0x64) & 0x01) { // Available data
             uint8_t scancode = i686_inb(0x60);
             
             if (scancode == 0x01) { // ESC
@@ -1006,7 +976,7 @@ int cmd_keytest(int argc, char* argv[]) {
                 printf(" (key pressed)");
             }
             
-            // Mostrar tecla si es conocida
+            // Show key if known
             if (!(scancode & 0x80)) {
                 char ascii = keyboard_scancode_to_ascii(scancode);
                 if (ascii >= 32 && ascii <= 126) {
@@ -1023,7 +993,7 @@ int cmd_keytest(int argc, char* argv[]) {
 int cmd_benchmark(int argc, char* argv[]) {
     printf("Running CPU benchmark suite...\n\n");
     
-    // Test aritmético
+    // Arithmetic Test
     printf("1. Arithmetic operations test: ");
     volatile uint32_t result = 0;
     for (uint32_t i = 0; i < 1000000; i++) {
@@ -1031,7 +1001,7 @@ int cmd_benchmark(int argc, char* argv[]) {
     }
     printf("DONE (result: %u)\n", result);
     
-    // Test de memoria
+    // Memory Test
     printf("2. Memory access test: ");
     volatile uint8_t* mem = (volatile uint8_t*)0x200000;
     for (uint32_t i = 0; i < 100000; i++) {
@@ -1040,14 +1010,14 @@ int cmd_benchmark(int argc, char* argv[]) {
     }
     printf("DONE\n");
     
-    // Test de llamadas a función
+    // Function Call Testing
     printf("3. Function call test: ");
     for (uint32_t i = 0; i < 50000; i++) {
         VGA_get_cursor_x();
     }
     printf("DONE\n");
     
-    // Test de operaciones lógicas
+    // Logical Operations Test
     printf("4. Logical operations test: ");
     for (uint32_t i = 0; i < 500000; i++) {
         result ^= (i << 1) | (i >> 1);
@@ -1105,69 +1075,9 @@ int cmd_registers(int argc, char* argv[]) {
     return 0;
 }
 
-int cmd_stack(int argc, char* argv[]) {
-    uint32_t* stack_ptr;
-    __asm__ volatile("movl %%esp, %0" : "=r"(stack_ptr));
-    
-    int entries = 16;
-    if (argc > 1) {
-        entries = dec_str_to_int(argv[1]);
-        if (entries > 32) entries = 32;
-        if (entries < 1) entries = 16;
-    }
-    
-    printf("Stack dump (ESP: 0x%08X, showing %d entries):\n", (uint32_t)stack_ptr, entries);
-    printf("Address   Value      ASCII\n");
-    printf("--------  --------   -----\n");
-    
-    for (int i = 0; i < entries; i++) {
-        printf("%08X: %08X   ", (uint32_t)(stack_ptr + i), stack_ptr[i]);
-        
-        // Mostrar como ASCII si es válido
-        uint8_t* bytes = (uint8_t*)&stack_ptr[i];
-        for (int j = 0; j < 4; j++) {
-            char c = bytes[j];
-            printf("%c", (c >= 32 && c <= 126) ? c : '.');
-        }
-        printf("\n");
-    }
-    
-    return 0;
-}
-
-// ============================================================================
-// COMANDOS DE RED (STUBS)
-// ============================================================================
-
-int cmd_ping(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: ping <host>\n");
-        return 1;
-    }
-    
-    printf("PING %s: Network stack not implemented\n", argv[1]);
-    printf("This would send ICMP echo requests when networking is available\n");
-    printf("Simulating ping...\n");
-    printf("PING %s: 64 bytes from %s: icmp_seq=1 ttl=64 time=0.1 ms (simulated)\n", argv[1], argv[1]);
-    printf("PING %s: 64 bytes from %s: icmp_seq=2 ttl=64 time=0.2 ms (simulated)\n", argv[1], argv[1]);
-    printf("PING %s: 64 bytes from %s: icmp_seq=3 ttl=64 time=0.1 ms (simulated)\n", argv[1], argv[1]);
-    return 0;
-}
-
-int cmd_netstat(int argc, char* argv[]) {
-    printf("Network Statistics:\n");
-    printf("  Network Stack: Not implemented\n");
-    printf("  Active Connections: None\n");
-    printf("  Interfaces:\n");
-    printf("    lo0: 127.0.0.1 (loopback) - simulated\n");
-    printf("  Routing Table: Empty\n");
-    printf("  Network Buffers: N/A\n");
-    return 0;
-}
-
-// ============================================================================
-// COMANDOS DE SYSTEM CALLS
-// ============================================================================
+//
+// System Call Commands
+//
 
 int cmd_syscall_test(int argc, char* argv[]) {
     if (argc < 2) {
@@ -1321,7 +1231,7 @@ int cmd_malloc_test(int argc, char* argv[]) {
     if (ptr) {
         printf("Success! Allocated at address: 0x%08X\n", (uint32_t)ptr);
         
-        // Escribir datos de prueba
+        // Write test data
         char* data = (char*)ptr;
         for (int i = 0; i < size && i < 100; i++) {
             data[i] = 'A' + (i % 26);
@@ -1438,21 +1348,21 @@ int cmd_sleep_test(int argc, char* argv[]) {
     return 0;
 }
 
-// ============================================================================
-// COMANDOS DE CONTROL DEL SISTEMA
-// ============================================================================
+//
+// System Control Commands
+//
 
 int cmd_reboot(int argc, char* argv[]) {
     printf("Rebooting system...\n");
     printf("Goodbye!\n");
     
-    // Usar el puerto del teclado para reboot
+    // Use the keyboard port for reboot
     i686_outb(0x64, 0xFE);
     
-    // Si el reboot falló, usar método alternativo
+    // If reboot failed, use alternative method
     printf("Primary reboot method failed, trying alternative...\n");
     
-    // Método de triple fault
+    // Triple fault method
     __asm__ volatile(
         "cli\n"
         "lidt %0\n"
@@ -1482,9 +1392,9 @@ int cmd_panic(int argc, char* argv[]) {
     return 0;
 }
 
-// ============================================================================
-// COMANDOS DE EDICIÓN DE ARCHIVOS
-// ============================================================================
+//
+// File Editing Commands
+//
 
 int cmd_create_file(int argc, char* argv[]) {
     if (argc < 2) {
@@ -1619,12 +1529,12 @@ end_edit:
     return 0;
 }
 
-// ============================================================================
-// TABLA DE COMANDOS UNIFICADA
-// ============================================================================
+//
+// Command Table
+//
 
 const ShellCommandEntry shell_commands[] = {
-    // Comandos básicos
+    // Basic Commands
     {"help",            "Show available commands",                          cmd_help},
     {"clear",           "Clear the screen",                                 cmd_clear},
     {"echo",            "Display a line of text",                           cmd_echo},
@@ -1632,59 +1542,52 @@ const ShellCommandEntry shell_commands[] = {
     {"test",            "Run all syscall tests",                            cmd_test_all},
     {"heap_test",       "Run heap integrity test",                          cmd_test_heap_integrity},
     
-    // Información del sistema
+    // System Information
     {"memory",          "Show memory information",                          cmd_memory},
     {"uptime",          "Show system uptime",                               cmd_uptime},
     {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
     {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
-    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod},
+    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod}, //FIXME:
     {"dmesg",           "Show kernel messages",                             cmd_dmesg},
-    {"ps",              "Show running processes",                           cmd_ps}, // FIXME
-    {"lspci",           "List PCI devices",                                 cmd_lspci}, // FIXME
     
-    // Sistema de archivos
-    {"ls",              "List directory contents",                          cmd_ls}, // FIXME
-    {"cat",             "Display file contents",                            cmd_cat}, // FIXME
-    {"mkdir",           "Create directory",                                 cmd_mkdir}, // FIXME
-    {"rm",              "Remove file or directory",                         cmd_rm}, // FIXME
-    {"find",            "Find files by name pattern",                       cmd_find}, // FIXME
+    // File System
+    {"ls",              "List directory contents",                          cmd_ls}, // FIXME:
+    {"cat",             "Display file contents",                            cmd_cat}, // FIXME:
+    {"mkdir",           "Create directory",                                 cmd_mkdir}, // FIXME:
+    {"rm",              "Remove file or directory",                         cmd_rm}, // FIXME:
+    {"find",            "Find files by name pattern",                       cmd_find}, // FIXME:
     {"grep",            "Search text in files",                             cmd_grep},
-    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME ALMOST
+    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME: ALMOST
     {"create_file",     "Create a new file",                                cmd_create_file}, // GET THE EDIT MODE OUT OF HERE --- GET OUT!!!
-    {"edit",            "Edit a text file",                                 cmd_edit}, // FIXME
+    {"edit",            "Edit a text file",                                 cmd_edit}, // FIXME:
     
-    // Hardware y debugging
+    // Hardware & Debug
     {"memtest",         "Run basic memory test",                            cmd_memtest},
-    {"ports",           "Read/write I/O ports",                             cmd_ports}, // FIXME
+    {"ports",           "Read/write I/O ports",                             cmd_ports}, // FIXME:
     {"interrupt",       "Control interrupt state",                          cmd_interrupt},
     {"hexdump",         "Display memory in hexadecimal",                    cmd_hexdump},
-    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest}, // FIXME
+    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest}, // FIXME:
     {"benchmark",       "Run CPU benchmark",                                cmd_benchmark},
     {"registers",       "Show CPU register values",                         cmd_registers},
-    {"stack",           "Show stack contents",                              cmd_stack}, // FIXME
     
-    // Red (stubs)
-    {"ping",            "Send ICMP echo requests",                          cmd_ping}, // FIXME
-    {"netstat",         "Show network statistics",                          cmd_netstat}, // FIXME
-    
-    // System calls
+    // System Calls
     {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
     {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
     {"heap_info",       "Show heap information and test",                   cmd_heap_info},
-    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, // FIXME
+    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, // FIXME:
     {"sleep",           "Test sleep syscall",                               cmd_sleep_test},
     
-    // Control del sistema
+    // System Control
     {"reboot",          "Restart the system",                               cmd_reboot},
     {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic},
     
-    // Terminador
+    // Terminator
     {NULL, NULL, NULL}
 };
 
-// ============================================================================
-// FUNCIONES AUXILIARES PARA MANEJO DE COMANDOS
-// ============================================================================
+//
+// Auxiliary Functions For Command Management
+//
 
 int get_shell_command_count(void) {
     int count = 0;
@@ -1700,20 +1603,3 @@ const ShellCommandEntry* find_shell_command(const char* name) {
     }
     return NULL;
 }
-
-/*
-TODO:
-- cmd uptime no muestra nada
-- cmd_dmesg sea real
-- cmd_ps no muestra nada
-- cmd_ls no funciona bien y sea real
-- cmd_mkdir sea real
-- cmd_rm sea real
-- cmd_find sea real-----------------
-- cmd_grep sea real-----------------
-- cmd_ports da error 1
-- cmd_stack no funciona bien
-- cmd_syscall_info se corta
-- cmd_syscall_sleep no funciona bien
-- cmd_exit quitar
-*/

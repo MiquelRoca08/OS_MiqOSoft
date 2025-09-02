@@ -3,36 +3,29 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-// ============================================================================
-// UTILIDADES DE LA SHELL
-// ============================================================================
+//
+// Compatibility Definitions
+//
 
-// Este header ahora es mucho más simple ya que la mayoría de funciones
-// se han movido a shell_commands.h o están implementadas internamente
-
-// ============================================================================
-// DEFINICIONES DE COMPATIBILIDAD
-// ============================================================================
-
-// Definición de size_t si no está disponible
+// Defining size_t if not available
 #ifndef SIZE_T_DEFINED
 #define SIZE_T_DEFINED
 typedef unsigned long size_t;
 #endif
 
-// ============================================================================
-// FUNCIONES DE FORMATEO
-// ============================================================================
+//
+// Formatting Functions
+//
 
-// Función auxiliar para formatear números (implementada en shell_main.c)
+// Helper function for formatting numbers
 void format_number(char* buffer, int num);
 
-// ============================================================================
-// FUNCIONES DE PRINTF ALTERNATIVAS
-// ============================================================================
+//
+// Alternative Prinf Functions
+//
 
-// Estas funciones pueden faltar en algunos entornos embedded
-// Si están disponibles en tu sistema, puedes comentar estas declaraciones
+// These functions may be missing in some embedded environments
+// If they are available on your system, you can comment out these declarations
 
 #ifndef PRINTF_FUNCTIONS_AVAILABLE
 int snprintf(char* buffer, size_t size, const char* format, ...);
@@ -40,16 +33,16 @@ int vsnprintf(char* buffer, size_t size, const char* format, va_list args);
 int vprintf(const char* format, va_list args);
 #endif
 
-// ============================================================================
-// MACROS DE UTILIDAD
-// ============================================================================
+//
+// Utility Macros
+//
 
-// Macro para obtener el tamaño de un array
+// Macro to get the size of an array
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #endif
 
-// Macros para min/max (si no están definidas en minmax.h)
+// Macros for min/max
 #ifndef MIN_MAX_DEFINED
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

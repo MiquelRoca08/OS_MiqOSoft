@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Tests para las syscalls
+// Tests for syscalls
 void syscall_test_basic(void) {
     printf("=== Testing Basic System Calls ===\n\n");
     
@@ -39,7 +39,7 @@ void syscall_test_memory(void) {
     printf("   Allocated ptr3: 0x%08X (128 bytes)\n", (uint32_t)ptr3);
     
     if (ptr1 && ptr2 && ptr3) {
-        // Escribir datos de prueba
+        // Writing test data
         char* data1 = (char*)ptr1;
         char* data2 = (char*)ptr2;
         char* data3 = (char*)ptr3;
@@ -71,7 +71,7 @@ void syscall_test_memory(void) {
 void syscall_test_files(void) {
     printf("=== Testing File System ===\n\n");
     
-    // Test SYSCALL_OPEN (archivo existente)
+    // Test SYSCALL_OPEN (existing file)
     printf("1. Testing sys_open() on existing file:\n");
     int32_t fd1 = sys_open("welcome.txt", OPEN_READ);
     printf("   File descriptor for 'welcome.txt': %d\n", fd1);
@@ -91,7 +91,7 @@ void syscall_test_files(void) {
         printf("   Close result: %d\n", close_result);
     }
     
-    // Test crear nuevo archivo
+    // Test create new file
     printf("\n4. Testing file creation:\n");
     int32_t fd2 = sys_open("test_file.txt", OPEN_CREATE | OPEN_WRITE);
     printf("   Created file descriptor: %d\n", fd2);
@@ -105,7 +105,7 @@ void syscall_test_files(void) {
         
         sys_close(fd2);
         
-        // Leer el archivo que acabamos de crear
+        // Read the file we just created
         printf("\n6. Testing read back created file:\n");
         int32_t fd3 = sys_open("test_file.txt", OPEN_READ);
         if (fd3 >= 0) {
@@ -123,18 +123,18 @@ void syscall_test_files(void) {
 void syscall_test_advanced(void) {
     printf("=== Testing Advanced Features ===\n\n");
     
-    // Test múltiples allocaciones y fragmentación
+    // Test multiple allocations and fragmentation
     printf("1. Testing memory fragmentation:\n");
     void* ptrs[10];
     
-    // Alocar múltiples bloques
+    // Allocate multiple blocks
     for (int i = 0; i < 10; i++) {
         ptrs[i] = sys_malloc(64 + i * 32);
         printf("   Allocated block %d: 0x%08X (%d bytes)\n", 
                i, (uint32_t)ptrs[i], 64 + i * 32);
     }
     
-    // Liberar algunos bloques (crear fragmentación)
+    // Free some blocks (create fragmentation)
     printf("\n2. Creating fragmentation by freeing alternate blocks:\n");
     for (int i = 1; i < 10; i += 2) {
         sys_free(ptrs[i]);
@@ -142,24 +142,24 @@ void syscall_test_advanced(void) {
         ptrs[i] = NULL;
     }
     
-    // Intentar alocar un bloque grande
+    // Try to place a large block
     printf("\n3. Trying to allocate large block after fragmentation:\n");
     void* large_ptr = sys_malloc(1024);
     printf("   Large allocation result: 0x%08X\n", (uint32_t)large_ptr);
     
-    // Limpiar memoria restante
+    // Clear remaining memory
     for (int i = 0; i < 10; i++) {
         if (ptrs[i]) sys_free(ptrs[i]);
     }
     if (large_ptr) sys_free(large_ptr);
     
-    // Test de sleep
+    // Sleep Test
     printf("\n4. Testing sys_sleep():\n");
     printf("   Sleeping for 100ms...\n");
     sys_sleep(100);
     printf("   Sleep completed\n");
     
-    // Test de yield
+    // Yield Test
     printf("\n5. Testing sys_yield():\n");
     int32_t yield_result = sys_yield();
     printf("   Yield result: %d\n", yield_result);
@@ -178,7 +178,7 @@ void syscall_stress_test(void) {
         void* ptr = sys_malloc(128);
         if (ptr) {
             success_count++;
-            // Escribir datos de prueba
+            // Writing test data
             memset(ptr, 0xAA, 128);
             sys_free(ptr);
         } else {
@@ -194,7 +194,7 @@ void syscall_stress_test(void) {
     int file_success = 0;
     int file_fail = 0;
     
-    // Crear múltiples archivos
+    // Create multiple files
     for (int i = 0; i < 20; i++) {
         snprintf(filename, sizeof(filename), "stress_test_%d.txt", i);
         int32_t fd = sys_open(filename, OPEN_CREATE | OPEN_WRITE);
@@ -231,19 +231,19 @@ void syscall_run_all_tests(void) {
     printf("====================================\n");
 }
 
-// Función de prueba específica para malloc/free
+// Specific test function for malloc/free
 void syscall_test_heap_integrity(void) {
     printf("=== Heap Integrity Test ===\n\n");
     
     void* test_ptrs[20];
     
-    // Fase 1: Allocar bloques de diferentes tamaños
+    // Phase 1: Allocate blocks of different sizes
     printf("Phase 1: Allocating various sized blocks\n");
     for (int i = 0; i < 20; i++) {
-        int size = 32 + (i * 16); // Tamaños de 32, 48, 64, 80, etc.
+        int size = 32 + (i * 16); // Sizes 32, 48, 64, 80, etc.
         test_ptrs[i] = sys_malloc(size);
         if (test_ptrs[i]) {
-            // Escribir patrón de prueba
+            // Write test pattern
             memset(test_ptrs[i], 0x55 + i, size);
             printf("  Block %d: 0x%08X (%d bytes)\n", i, (uint32_t)test_ptrs[i], size);
         } else {
@@ -251,7 +251,7 @@ void syscall_test_heap_integrity(void) {
         }
     }
     
-    // Fase 2: Verificar integridad de datos
+    // Phase 2: Verify data integrity
     printf("\nPhase 2: Verifying data integrity\n");
     bool integrity_ok = true;
     for (int i = 0; i < 20; i++) {
@@ -273,7 +273,7 @@ void syscall_test_heap_integrity(void) {
         }
     }
     
-    // Fase 3: Liberar bloques alternos
+    // Phase 3: Release alternate blocks
     printf("\nPhase 3: Freeing alternate blocks\n");
     for (int i = 1; i < 20; i += 2) {
         if (test_ptrs[i]) {
@@ -283,7 +283,7 @@ void syscall_test_heap_integrity(void) {
         }
     }
     
-    // Fase 4: Verificar que los bloques restantes siguen íntegros
+    // Phase 4: Verify that the remaining blocks are still intact
     printf("\nPhase 4: Verifying remaining blocks\n");
     for (int i = 0; i < 20; i += 2) {
         if (test_ptrs[i]) {
@@ -304,7 +304,7 @@ void syscall_test_heap_integrity(void) {
         }
     }
     
-    // Fase 5: Limpiar memoria restante
+    // Phase 5: Clear remaining memory
     printf("\nPhase 5: Cleaning up remaining blocks\n");
     for (int i = 0; i < 20; i += 2) {
         if (test_ptrs[i]) {

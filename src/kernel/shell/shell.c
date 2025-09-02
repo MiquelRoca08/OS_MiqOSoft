@@ -13,21 +13,21 @@
 
 #define COMMAND_MAX_LEN 256
 
-// Definición de size_t si no está disponible
+// Definition of size_t if not available
 #ifndef SIZE_T_DEFINED
 #define SIZE_T_DEFINED
 typedef unsigned long size_t;
 #endif
 
-// Buffer para la línea de comandos actual
+// Buffer for the current command line
 static char command_buffer[SHELL_BUFFER_SIZE];
 static int command_pos = 0;
-static int cursor_position = 0;  // Posición del cursor en la línea de comandos
+static int cursor_position = 0;  // Cursor position in the command line
 static bool shell_running = false;
 
-// ============================================================================
-// FUNCIONES DE STRING PARA LA SHELL
-// ============================================================================
+//
+// String Functions
+//
 
 int shell_strlen(const char* str) {
     int len = 0;
@@ -77,9 +77,9 @@ char* shell_strncpy(char* dest, const char* src, int n) {
     return dest;
 }
 
-// ============================================================================
-// FUNCIONES DE INTERFACE DE LA SHELL
-// ============================================================================
+//
+// Shell Interface Functions
+//
 
 void shell_redraw_screen(void) {
     extern int g_ScreenX, g_ScreenY;
@@ -95,30 +95,30 @@ void shell_clear_line(void) {
     extern int g_ScreenX, g_ScreenY;
     int prompt_len = shell_strlen(SHELL_PROMPT);
     
-    // Ir al inicio de la línea (después del prompt)
+    // Go to the beginning of the line (after the prompt)
     g_ScreenX = prompt_len;
     VGA_setcursor(g_ScreenX, g_ScreenY);
     
-    // Borrar hasta el final de la línea
+    // Erase to the end of the line
     for (int i = 0; i < command_pos; i++) {
         printf(" ");
     }
     
-    // Volver al inicio
+    // Go back to the beginning
     g_ScreenX = prompt_len;
     VGA_setcursor(g_ScreenX, g_ScreenY);
 }
 
 void shell_display_command(const char* cmd) {
-    // Limpiar línea actual
+    // Clear current line
     shell_clear_line();
     
-    // Copiar nuevo comando
+    // Copy new command
     shell_strncpy(command_buffer, cmd, SHELL_BUFFER_SIZE - 1);
     command_buffer[SHELL_BUFFER_SIZE - 1] = '\0';
     command_pos = shell_strlen(command_buffer);
     
-    // Mostrar el comando
+    // Display the command
     printf("%s", command_buffer);
 }
 
@@ -142,9 +142,9 @@ void shell_move_cursor_right(void) {
     }
 }
 
-// ============================================================================
-// FUNCIONES PRINCIPALES DE LA SHELL
-// ============================================================================
+//
+// Main Shell Functions
+//
 
 void shell_init(void) {
     memset(command_buffer, 0, sizeof(command_buffer));
@@ -152,7 +152,6 @@ void shell_init(void) {
     cursor_position = 0;
     shell_running = true;
     
-    // IMPORTANTE: Activar el modo shell en el sistema de teclado
     keyboard_set_shell_mode(true);
     
     printf("MiqOSoft Shell v1.0\n");
@@ -161,7 +160,7 @@ void shell_init(void) {
     
     printf("\n");
     
-    // Sincronizar el sistema de teclado con la posición actual del cursor VGA
+    // Synchronize the keyboard system with the current VGA cursor position
     extern int cursor_line, cursor_pos, total_lines_used;
     extern int line_lengths[];
     
@@ -174,13 +173,13 @@ void shell_init(void) {
 }
 
 void shell_print_prompt(void) {
-    // Sincronizar cursor del teclado con la posición VGA actual
+    // Synchronize keyboard cursor with current VGA position
     extern int cursor_line, cursor_pos, total_lines_used;
     extern int line_lengths[];
     
     printf(SHELL_PROMPT);
     
-    // Actualizar variables del sistema de teclado
+    // Update keyboard system variables
     cursor_line = VGA_get_cursor_y();
     cursor_pos = VGA_get_cursor_x();
     total_lines_used = cursor_line + 1;
@@ -190,19 +189,19 @@ void shell_print_prompt(void) {
 void shell_run(void) {
     char c;
     
-    // Leer caracteres directamente del buffer circular de keyboard.c
+    // Read characters directly from the circular buffer of keyboard.c
     while (keyboard_buffer_pop(&c)) {
         if (c == '\n') {
-            // Enter presionado - procesar comando
+            // Enter pressed - process command
             printf("\n");
             command_buffer[command_pos] = '\0';
-            
+
             if (command_pos > 0) {
-                // Agregar al historial antes de procesar
+                // Add to history before processing
                 shell_process_command(command_buffer);
             }
-            
-            // Reset buffer y cursor
+
+            // Reset buffer and cursor
             memset(command_buffer, 0, sizeof(command_buffer));
             command_pos = 0;
             cursor_position = 0;
@@ -211,63 +210,63 @@ void shell_run(void) {
         } else if (c == '\b') {
             // Backspace
             if (cursor_position > 0 && command_pos > 0) {
-                // Si el cursor no está al final, mover caracteres
+                // If the cursor is not at the end, move characters
                 if (cursor_position < command_pos) {
                     for (int i = cursor_position - 1; i < command_pos - 1; i++) {
                         command_buffer[i] = command_buffer[i + 1];
                     }
                 }
-                
+
                 command_pos--;
                 cursor_position--;
                 command_buffer[command_pos] = '\0';
-                
-                // Redibujar línea
+
+                // Redraw line
                 extern int g_ScreenX, g_ScreenY;
                 int prompt_len = shell_strlen(SHELL_PROMPT);
                 g_ScreenX = prompt_len;
                 VGA_setcursor(g_ScreenX, g_ScreenY);
-                
-                // Limpiar línea y redibujar
+
+                // Clear line and redraw
                 for (int i = 0; i <= command_pos + 1; i++) printf(" ");
                 g_ScreenX = prompt_len;
                 VGA_setcursor(g_ScreenX, g_ScreenY);
                 printf("%s", command_buffer);
-                
-                // Posicionar cursor
+
+                // Position cursor
                 g_ScreenX = prompt_len + cursor_position;
                 VGA_setcursor(g_ScreenX, g_ScreenY);
             }
             
-        } else if (c == 0x01) {
-            // UP - historial anterior
+        } else if (c == 0x01) { // TODO:
+            // UP - previous history
 
-        } else if (c == 0x02) {
-            // DOWN - historial siguiente
+        } else if (c == 0x02) { // TODO:
+            // DOWN - next history
 
         } else if (c == 0x03) {
-            // LEFT - mover cursor izquierda
+            // LEFT - move cursor left
             shell_move_cursor_left();
             
         } else if (c == 0x04) {
-            // RIGHT - mover cursor derecha
+            // RIGHT - move cursor right
             shell_move_cursor_right();
             
         } else if (c >= 32 && c <= 126) {
-            // Carácter imprimible
+            // Printable character
             if (command_pos < SHELL_BUFFER_SIZE - 1) {
-                // Si cursor no está al final, insertar carácter
+                // If cursor is not at the end, insert character
                 if (cursor_position < command_pos) {
                     for (int i = command_pos; i > cursor_position; i--) {
                         command_buffer[i] = command_buffer[i - 1];
                     }
                 }
-                
+
                 command_buffer[cursor_position] = c;
                 command_pos++;
                 cursor_position++;
-                
-                // Redibujar desde cursor hasta final
+
+                // Redraw from cursor to end
                 extern int g_ScreenX, g_ScreenY;
                 int start_x = g_ScreenX;
                 printf("%s", &command_buffer[cursor_position - 1]);
@@ -275,7 +274,7 @@ void shell_run(void) {
                 VGA_setcursor(g_ScreenX, g_ScreenY);
             }
         } else if (c != 0) {
-            // Caracteres especiales (acentos, ñ, etc.)
+            // Special characters (accents, ñ, etc.)
             if (command_pos < SHELL_BUFFER_SIZE - 1) {
                 if (cursor_position < command_pos) {
                     for (int i = command_pos; i > cursor_position; i--) {
@@ -298,14 +297,14 @@ int shell_parse_command(const char* input, char* argv[]) {
     int i = 0;
     bool in_word = false;
     
-    // Copiar input a buffer local
+    // Copy input to local buffer
     while (input[i] && i < SHELL_BUFFER_SIZE - 1) {
         local_buffer[i] = input[i];
         i++;
     }
     local_buffer[i] = '\0';
     
-    // Parsear argumentos
+    // Parse arguments
     i = 0;
     while (local_buffer[i] && argc < SHELL_MAX_ARGS - 1) {
         if (local_buffer[i] != ' ' && local_buffer[i] != '\t') {
@@ -333,7 +332,7 @@ void shell_process_command(const char* input) {
     
     if (argc == 0) return;
     
-    // Buscar comando en la tabla unificada
+    // Search command in the unified table
     const ShellCommandEntry* cmd = find_shell_command(argv[0]);
     if (cmd && cmd->function) {
         int result = cmd->function(argc, argv);
@@ -346,7 +345,7 @@ void shell_process_command(const char* input) {
     }
 }
 
-// Función para obtener la línea actual (requerida por el header shell.h)
+// Function to get the current line (required by shell.h header)
 char* shell_get_current_line(void) {
     return command_buffer;
 }

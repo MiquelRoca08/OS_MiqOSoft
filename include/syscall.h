@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// Número de la interrupción para syscalls
+// Interrupt number for syscalls
 #define SYSCALL_INTERRUPT   0x80
 
-// Números de syscalls
+// Syscall numbers
 typedef enum {
     SYSCALL_EXIT = 0,
     SYSCALL_PRINT = 1,
@@ -36,10 +36,10 @@ typedef enum {
     SYSCALL_MOUNT = 25,
     SYSCALL_UMOUNT = 26,
     
-    SYSCALL_COUNT = 27  // Número total de syscalls
+    SYSCALL_COUNT = 27  // Total number of syscalls
 } syscall_number_t;
 
-// Códigos de error
+// Error codes
 typedef enum {
     SYSCALL_OK = 0,
     SYSCALL_ERROR = -1,
@@ -56,41 +56,41 @@ typedef enum {
     SYSCALL_NOT_EMPTY = -12
 } syscall_error_t;
 
-// Estructura para información de archivos
+// Structure for file information
 typedef struct {
     uint32_t size;
-    uint32_t type;      // 0 = archivo, 1 = directorio
+    uint32_t type;      // 0 = file, 1 = directory
     uint32_t mode;
     uint32_t created_time;
     uint32_t modified_time;
 } stat_info_t;
 
-// Flags para open
+// Flags for open
 #define OPEN_READ       0x01
 #define OPEN_WRITE      0x02
 #define OPEN_CREATE     0x04
 #define OPEN_TRUNCATE   0x08
 #define OPEN_APPEND     0x10
 
-// Flags para mmap
+//Flags for mmap
 #define MMAP_READ       0x01
 #define MMAP_WRITE      0x02
 #define MMAP_EXECUTE    0x04
 #define MMAP_PRIVATE    0x08
 #define MMAP_SHARED     0x10
 
-// Tipo de función para handlers de syscall
+// Function type for syscall handlers
 typedef int32_t (*syscall_handler_t)(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
 
-// Funciones del kernel para manejo de syscalls
+// Kernel functions for handling syscalls
 void syscall_initialize(void);
 void syscall_register_handler(syscall_number_t num, syscall_handler_t handler);
 int32_t syscall_dispatch(uint32_t syscall_num, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
 
-// Funciones de utilidad para hacer syscalls desde código del kernel
+// Utility functions for making syscalls from kernel code
 int32_t syscall_invoke(syscall_number_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
 
-// Macro para definir syscalls inline assembly (para userland)
+// Macro to define syscalls inline assembly (for userland)
 #define SYSCALL0(num) ({ \
     int32_t result; \
     __asm__ volatile( \
@@ -146,7 +146,7 @@ int32_t syscall_invoke(syscall_number_t num, uint32_t arg1, uint32_t arg2, uint3
     result; \
 })
 
-// Funciones wrapper para syscalls (para userland)
+// Wrapper functions for syscalls (for userland)
 static inline int32_t sys_exit(int32_t code) {
     return SYSCALL1(SYSCALL_EXIT, code);
 }
