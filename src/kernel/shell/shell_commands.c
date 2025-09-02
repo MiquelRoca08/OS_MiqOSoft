@@ -490,14 +490,52 @@ int cmd_lsmod(int argc, char* argv[]) {
     return 0;
 }
 
+
+extern uint32_t sys_time(void);
+
+// Funciones del sistema dmesg - AGREGAR ESTA LÍNEA
+extern void kernel_add_message(char level, const char* component, const char* message);
+
+// Funciones de dmesg
 extern void display_kernel_messages(void);
+extern void dmesg_clear(void);
+extern void dmesg_stats(void);
 
+// Versión simplificada del comando dmesg
 int cmd_dmesg(int argc, char* argv[]) {
-    display_kernel_messages();
-
-    if (argc > 1 && shell_strcmp(argv[1], "--help") == 0) {
-        printf("\ndmesg - Display kernel boot messages\n");
-        printf("Shows messages logged during system startup\n");
+    if (argc == 1) {
+        // Mostrar mensajes
+        display_kernel_messages();
+    } else if (argc == 2) {
+        // Verificar opciones usando la función shell_strcmp que ya tienes
+        if (shell_strcmp(argv[1], "--help") == 0 || shell_strcmp(argv[1], "-h") == 0) {
+            printf("dmesg - Display kernel boot messages\n");
+            printf("Usage:\n");
+            printf("  dmesg           Show boot messages\n");
+            printf("  dmesg --clear   Clear message buffer\n");
+            printf("  dmesg --stats   Show buffer statistics\n");
+            printf("  dmesg --test    Add test message\n");
+            printf("  dmesg --help    Show this help\n");
+        } 
+        else if (shell_strcmp(argv[1], "--clear") == 0) {
+            dmesg_clear();
+        }
+        else if (shell_strcmp(argv[1], "--stats") == 0) {
+            dmesg_stats();
+        }
+        else if (shell_strcmp(argv[1], "--test") == 0) {
+            // Agregar mensaje de prueba
+            kernel_add_message('T', "test", "This is a test message from shell");
+            printf("Test message added to dmesg buffer\n");
+        }
+        else {
+            printf("dmesg: Unknown option '%s'\n", argv[1]);
+            printf("Use 'dmesg --help' for help\n");
+            return 1;
+        }
+    } else {
+        printf("dmesg: Too many arguments\n");
+        return 1;
     }
 
     return 0;
