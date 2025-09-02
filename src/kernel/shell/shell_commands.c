@@ -345,9 +345,9 @@ int cmd_memory(int argc, char* argv[]) {
     printf("  Kernel Memory Range: 0x100000 - 0x200000 (1MB)\n");
     
     // Memory system constants (obtained from VFS/syscalls)
-    const uint32_t HEAP_START = 0x400000    // 4MB
-    const uint32_t HEAP_SIZE = 0x100000     // 1MB
-    const uint32_t BLOCK_SIZE = 32          // Minimum block size
+    const uint32_t HEAP_START = 0x400000;    // 4MB
+    const uint32_t HEAP_SIZE = 0x100000;     // 1MB
+    const uint32_t BLOCK_SIZE = 32;          // Minimum block size
     
     printf("  Heap Start: 0x%08X (%dMB)\n", HEAP_START, HEAP_START / 1048576);
     printf("  Heap Size: %dKB (%d bytes)\n", HEAP_SIZE / 1024, HEAP_SIZE);
