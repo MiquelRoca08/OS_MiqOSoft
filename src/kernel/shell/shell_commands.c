@@ -10,25 +10,7 @@
 #include <x86.h>
 
 //
-// External Declarations
-//
-
-// Functions from shell.c
-extern int shell_strlen(const char* str);
-extern int shell_strcmp(const char* s1, const char* s2);
-extern char* shell_strchr(const char* str, int c);
-extern char* shell_strstr(const char* haystack, const char* needle);
-extern char* shell_strncpy(char* dest, const char* src, int n);
-
-// Functions from syscall_test.c
-extern void syscall_run_all_tests(void);
-extern void syscall_test_heap_integrity(void);
-
-// Functions from the time subsystem
-extern uint32_t sys_time(void);
-
-//
-// Auxiliary Utility
+// UTILITY FUNCTIONS - MUST BE FIRST
 //
 
 // Simple memcpy implementation
@@ -41,7 +23,7 @@ void* shell_memcpy(void* dest, const void* src, size_t n) {
     return dest;
 }
 
-// Simple memset implementation
+// Simple memset implementation  
 void* shell_memset(void* s, int c, size_t n) {
     unsigned char* p = s;
     while (n--) {
@@ -60,7 +42,7 @@ void format_number(char* buffer, int num) {
 
     int i = 0;
     int temp_num = num;
-    char temp_str[11]; // Max 10 digits for a 32-bit int + null terminator
+    char temp_str[11];
 
     while (temp_num > 0) {
         temp_str[i++] = (temp_num % 10) + '0';
@@ -171,64 +153,300 @@ uint32_t dec_str_to_int(const char* dec_str) {
 }
 
 //
+// External Declarations
+//
+
+// Functions from shell.c
+extern int shell_strlen(const char* str);
+extern int shell_strcmp(const char* s1, const char* s2);
+extern char* shell_strchr(const char* str, int c);
+extern char* shell_strstr(const char* haystack, const char* needle);
+extern char* shell_strncpy(char* dest, const char* src, int n);
+
+// Functions from syscall_test.c
+extern void syscall_run_all_tests(void);
+extern void syscall_test_heap_integrity(void);
+
+// Functions from time subsystem
+extern uint32_t sys_time(void);
+
+// Functions from dmesg
+extern void display_kernel_messages(void);
+extern void dmesg_clear(void);
+extern void dmesg_stats(void);
+extern void kernel_add_message(char level, const char* component, const char* message);
+
+//
+// RAM-BASED FILE SYSTEM IMPLEMENTATION
+//
+
+#define MAX_FILES 64
+#define MAX_FILENAME_LEN 32
+#define MAX_FILE_SIZE 4096
+#define MAX_PATH_DEPTH 8
+
+typedef struct ram_file {
+    char name[MAX_FILENAME_LEN];
+    char* data;
+    uint32_t size;
+    uint32_t capacity;
+    uint32_t is_directory;
+    uint32_t parent_index;
+    uint32_t in_use;
+    uint32_t created_time;
+} ram_file_t;
+
+typedef struct ram_fs {
+    ram_file_t files[MAX_FILES];
+    uint32_t file_count;
+    uint32_t current_dir;
+    uint32_t initialized;
+} ram_fs_t;
+
+static ram_fs_t g_ramfs;
+
+// Initialize the RAM file system
+void ramfs_init(void) {
+    if (g_ramfs.initialized) return;
+    
+    shell_memset(&g_ramfs, 0, sizeof(ram_fs_t));
+    
+    // Create root directory
+    g_ramfs.files[0].name[0] = '/';
+    g_ramfs.files[0].name[1] = '\0';
+    g_ramfs.files[0].is_directory = 1;
+    g_ramfs.files[0].parent_index = 0; // Root points to itself
+    g_ramfs.files[0].in_use = 1;
+    g_ramfs.files[0].created_time = sys_time();
+    
+    g_ramfs.file_count = 1;
+    g_ramfs.current_dir = 0;
+    g_ramfs.initialized = 1;
+    
+    printf("RAM File System initialized\n");
+}
+
+// Find file by name in current directory
+int ramfs_find_file(const char* name, uint32_t parent_dir) {
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (g_ramfs.files[i].in_use && 
+            g_ramfs.files[i].parent_index == parent_dir &&
+            shell_strcmp(g_ramfs.files[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Find free file slot
+int ramfs_find_free_slot(void) {
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (!g_ramfs.files[i].in_use) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Create a new file or directory
+int ramfs_create(const char* name, uint32_t is_directory) {
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    // Check if file already exists
+    if (ramfs_find_file(name, g_ramfs.current_dir) >= 0) {
+        return -1; // File exists
+    }
+    
+    // Find free slot
+    int slot = ramfs_find_free_slot();
+    if (slot < 0) {
+        return -2; // No free slots
+    }
+    
+    // Create the file
+    ram_file_t* file = &g_ramfs.files[slot];
+    shell_strncpy(file->name, name, MAX_FILENAME_LEN - 1);
+    file->name[MAX_FILENAME_LEN - 1] = '\0';
+    
+    if (!is_directory) {
+        file->data = (char*)sys_malloc(256); // Initial size
+        if (!file->data) return -3; // Out of memory
+        file->capacity = 256;
+        file->size = 0;
+        file->data[0] = '\0';
+    } else {
+        file->data = NULL;
+        file->capacity = 0;
+        file->size = 0;
+    }
+    
+    file->is_directory = is_directory;
+    file->parent_index = g_ramfs.current_dir;
+    file->in_use = 1;
+    file->created_time = sys_time();
+    
+    g_ramfs.file_count++;
+    return slot;
+}
+
+// Delete a file
+int ramfs_delete(const char* name) {
+    int file_index = ramfs_find_file(name, g_ramfs.current_dir);
+    if (file_index < 0) return -1; // Not found
+    
+    ram_file_t* file = &g_ramfs.files[file_index];
+    
+    // Check if directory is empty
+    if (file->is_directory) {
+        for (int i = 0; i < MAX_FILES; i++) {
+            if (g_ramfs.files[i].in_use && g_ramfs.files[i].parent_index == file_index) {
+                return -2; // Directory not empty
+            }
+        }
+    }
+    
+    // Free memory if it's a file
+    if (file->data) {
+        sys_free(file->data);
+    }
+    
+    // Mark as free
+    shell_memset(file, 0, sizeof(ram_file_t));
+    g_ramfs.file_count--;
+    
+    return 0;
+}
+
+// Write data to file
+int ramfs_write_file(const char* name, const char* data, uint32_t size) {
+    int file_index = ramfs_find_file(name, g_ramfs.current_dir);
+    if (file_index < 0) {
+        // Create new file
+        file_index = ramfs_create(name, 0);
+        if (file_index < 0) return file_index;
+    }
+    
+    ram_file_t* file = &g_ramfs.files[file_index];
+    if (file->is_directory) return -1; // Can't write to directory
+    
+    // Expand buffer if needed
+    if (size > file->capacity) {
+        uint32_t new_capacity = ((size + 255) / 256) * 256; // Round up to 256 bytes
+        char* new_data = (char*)sys_malloc(new_capacity);
+        if (!new_data) return -3; // Out of memory
+        
+        if (file->data) {
+            shell_memcpy(new_data, file->data, file->size);
+            sys_free(file->data);
+        }
+        
+        file->data = new_data;
+        file->capacity = new_capacity;
+    }
+    
+    // Write data
+    shell_memcpy(file->data, data, size);
+    file->size = size;
+    if (size > 0) {
+        file->data[size] = '\0'; // Null terminate for text files
+    }
+    
+    return size;
+}
+
+// Read data from file
+int ramfs_read_file(const char* name, char* buffer, uint32_t buffer_size) {
+    int file_index = ramfs_find_file(name, g_ramfs.current_dir);
+    if (file_index < 0) return -1; // Not found
+    
+    ram_file_t* file = &g_ramfs.files[file_index];
+    if (file->is_directory) return -2; // Can't read directory as file
+    
+    uint32_t to_read = file->size < buffer_size ? file->size : buffer_size;
+    shell_memcpy(buffer, file->data, to_read);
+    
+    return to_read;
+}
+
+// Get current directory path
+void ramfs_get_current_path(char* buffer, uint32_t buffer_size) {
+    if (g_ramfs.current_dir == 0) {
+        shell_strncpy(buffer, "/", buffer_size);
+        return;
+    }
+    
+    // Build path backwards
+    char temp_path[256];
+    int pos = 255;
+    temp_path[pos] = '\0';
+    
+    uint32_t dir_index = g_ramfs.current_dir;
+    while (dir_index != 0) {
+        ram_file_t* dir = &g_ramfs.files[dir_index];
+        int name_len = shell_strlen(dir->name);
+        
+        pos -= name_len;
+        if (pos < 0) break;
+        shell_memcpy(&temp_path[pos], dir->name, name_len);
+        
+        pos--;
+        if (pos < 0) break;
+        temp_path[pos] = '/';
+        
+        dir_index = dir->parent_index;
+    }
+    
+    shell_strncpy(buffer, &temp_path[pos], buffer_size);
+}
+
+//
 // Auxiliary Function For Command Categorization
 //
 
 const char* get_command_category(const char* name) {
-    // Categorías para organizar los comandos
-    const char* categories[] = {
-        "Basic Commands",
-        "System Information",
-        "File System",
-        "Hardware & Debug",
-        "System Calls",
-        "System Control",
-        "Network"
-    };
-    
     // Basic Commands
     if (shell_strcmp(name, "help") == 0 || shell_strcmp(name, "clear") == 0 ||
-        shell_strcmp(name, "echo") == 0 || shell_strcmp(name, "version") == 0 ||
-        shell_strcmp(name, "test") == 0 || shell_strcmp(name, "heap_test") == 0) {
-        return categories[0];
+        shell_strcmp(name, "echo") == 0 || shell_strcmp(name, "version") == 0) {
+        return "Basic Commands";
     }
     // System Information
     else if (shell_strcmp(name, "memory") == 0 || shell_strcmp(name, "uptime") == 0 ||
              shell_strcmp(name, "cpuinfo") == 0 || shell_strcmp(name, "cpuid") == 0 ||
              shell_strcmp(name, "lsmod") == 0 || shell_strcmp(name, "dmesg") == 0) {
-        return categories[1];
+        return "System Information";
     }
     // File System
-    else if (shell_strcmp(name, "ls") == 0 || shell_strcmp(name, "cat") == 0 ||
-             shell_strcmp(name, "mkdir") == 0 || shell_strcmp(name, "rm") == 0 ||
+    else if (shell_strcmp(name, "ls") == 0 || shell_strcmp(name, "cd") == 0 ||
+             shell_strcmp(name, "pwd") == 0 || shell_strcmp(name, "mkdir") == 0 ||
+             shell_strcmp(name, "rm") == 0 || shell_strcmp(name, "cat") == 0 ||
+             shell_strcmp(name, "edit") == 0 || shell_strcmp(name, "touch") == 0 ||
              shell_strcmp(name, "find") == 0 || shell_strcmp(name, "grep") == 0 ||
-             shell_strcmp(name, "wc") == 0 || shell_strcmp(name, "create_file") == 0 ||
-             shell_strcmp(name, "edit") == 0) {
-        return categories[2];
+             shell_strcmp(name, "wc") == 0) {
+        return "File System";
     }
     // Hardware & Debug
     else if (shell_strcmp(name, "memtest") == 0 || shell_strcmp(name, "ports") == 0 ||
              shell_strcmp(name, "interrupt") == 0 || shell_strcmp(name, "hexdump") == 0 ||
              shell_strcmp(name, "keytest") == 0 || shell_strcmp(name, "benchmark") == 0 ||
              shell_strcmp(name, "registers") == 0) {
-        return categories[3];
+        return "Hardware & Debug";
     }
     // System Calls
     else if (shell_strcmp(name, "syscall_test") == 0 || shell_strcmp(name, "malloc_test") == 0 ||
              shell_strcmp(name, "heap_info") == 0 || shell_strcmp(name, "syscall_info") == 0 ||
              shell_strcmp(name, "sleep") == 0) {
-        return categories[4];
+        return "System Calls";
     }
     // System Control
     else if (shell_strcmp(name, "reboot") == 0 || shell_strcmp(name, "panic") == 0) {
-        return categories[5];
+        return "System Control";
     }
-    // Default category
+    
     return "Other Commands";
 }
 
 //
-// Basic System Commands
+// COMMAND IMPLEMENTATIONS
 //
 
 extern const ShellCommandEntry shell_commands[];
@@ -236,25 +454,22 @@ extern const ShellCommandEntry shell_commands[];
 int cmd_help(int argc, char* argv[]) {
     printf("=== MiqOSoft Shell Commands ===\n\n");
     
-    // Categorías para organizar los comandos
     const char* categories[] = {
         "Basic Commands",
-        "System Information",
+        "System Information", 
         "File System",
         "Hardware & Debug",
         "System Calls",
-        "System Control",
-        "Network"
+        "System Control"
     };
     
     const int LINES_PER_PAGE = 20;
     int line_count = 0;
     
-        // Show commands by category
-    for (int cat = 0; cat < 7; cat++) {
+    for (int cat = 0; cat < 6; cat++) {
         bool category_has_commands = false;
         
-        // First pass: check if the category has commands
+        // Check if category has commands
         for (int i = 0; shell_commands[i].name != NULL; i++) {
             if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
                 category_has_commands = true;
@@ -262,14 +477,11 @@ int cmd_help(int argc, char* argv[]) {
             }
         }
         
-        if (!category_has_commands) {
-            continue;
-        }
+        if (!category_has_commands) continue;
         
         printf("[%s]\n", categories[cat]);
         line_count++;
         
-        // Second pass: show commands of this category
         for (int i = 0; shell_commands[i].name != NULL; i++) {
             if (shell_strcmp(get_command_category(shell_commands[i].name), categories[cat]) == 0) {
                 printf("  %s - %s\n", shell_commands[i].name, shell_commands[i].description);
@@ -320,7 +532,7 @@ int cmd_version(int argc, char* argv[]) {
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
-    printf("Features: System calls, VFS, Memory management\n");
+    printf("Features: RAM File System, System calls, Memory management\n");
     return 0;
 }
 
@@ -366,7 +578,7 @@ int cmd_memory(int argc, char* argv[]) {
         printf("  Test allocation 2: 0x%08X (2KB)\n", (uint32_t)test_ptr2);
         printf("  Test allocation 3: 0x%08X (4KB)\n", (uint32_t)test_ptr3);
         
-    // Calculate approximate space between blocks
+        // Calculate approximate space between blocks
         uint32_t block_overhead = 0;
         if (test_ptr2 > test_ptr1) {
             block_overhead = (uint32_t)test_ptr2 - (uint32_t)test_ptr1 - 1024;
@@ -374,7 +586,7 @@ int cmd_memory(int argc, char* argv[]) {
         
         printf("  Block overhead: ~%d bytes\n", block_overhead);
         
-    // Free test memory
+        // Free test memory
         sys_free(test_ptr1);
         sys_free(test_ptr2);
         sys_free(test_ptr3);
@@ -485,15 +697,6 @@ int cmd_lsmod(int argc, char* argv[]) {
     return 0;
 }
 
-extern uint32_t sys_time(void);
-
-// Dmesg system functions
-extern void kernel_add_message(char level, const char* component, const char* message);
-extern void display_kernel_messages(void);
-extern void dmesg_clear(void);
-extern void dmesg_stats(void);
-
-// Simplified version of the dmesg command
 int cmd_dmesg(int argc, char* argv[]) {
     if (argc == 1) {
         // Show messages
@@ -515,7 +718,7 @@ int cmd_dmesg(int argc, char* argv[]) {
             dmesg_stats();
         }
         else if (shell_strcmp(argv[1], "--test") == 0) {
-        // Add test message
+            // Add test message
             kernel_add_message('T', "test", "This is a test message from shell");
             printf("Test message added to dmesg buffer\n");
         }
@@ -533,61 +736,149 @@ int cmd_dmesg(int argc, char* argv[]) {
 }
 
 //
-// Virtual File System
+// FUNCTIONAL FILE SYSTEM COMMANDS
 //
 
 int cmd_ls(int argc, char* argv[]) {
-    printf("Directory listing:\n");
-    printf("%-20s %-10s %s\n", "Name", "Type", "Size");
-    printf("----------------------------------------\n");
+    if (!g_ramfs.initialized) ramfs_init();
     
-    int32_t dir_fd = sys_open(".", OPEN_READ);
-    if (dir_fd < 0) {
-        printf("Error: Could not open directory (error: %d)\n", dir_fd);
-        return 1;
-    }
+    char current_path[64];
+    ramfs_get_current_path(current_path, sizeof(current_path));
     
-    char buffer[512];
-    int32_t bytes_read = sys_read(dir_fd, buffer, sizeof(buffer));
+    printf("Directory listing for %s:\n", current_path);
+    printf("%-20s %-8s %-10s %-12s\n", "Name", "Type", "Size", "Created");
+    printf("------------------------------------------------------\n");
     
-    if (bytes_read < 0) {
-        printf("Error: Could not read directory (error: %d)\n", bytes_read);
-        sys_close(dir_fd);
-        return 1;
-    }
-    
-    for (int i = 0; i < bytes_read; i += 32) {
-        if (buffer[i] == 0 || (uint8_t)buffer[i] == 0xE5) continue;
-        
-        char name[13] = {0};
-        int name_idx = 0;
-        
-        for (int j = 0; j < 8; j++) {
-            if (buffer[i + j] == ' ') continue;
-            name[name_idx++] = buffer[i + j];
+    int count = 0;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (g_ramfs.files[i].in_use && g_ramfs.files[i].parent_index == g_ramfs.current_dir) {
+            ram_file_t* file = &g_ramfs.files[i];
+            
+            printf("%-20s %-8s %-10u %-12u\n",
+                   file->name,
+                   file->is_directory ? "[DIR]" : "[FILE]",
+                   file->is_directory ? 0U : file->size,
+                   file->created_time);
+            count++;
         }
-        
-        if (buffer[i + 8] != ' ') {
-            name[name_idx++] = '.';
-            for (int j = 0; j < 3; j++) {
-                if (buffer[i + 8 + j] == ' ') continue;
-                name[name_idx++] = buffer[i + 8 + j];
-            }
-        }
-        
-        name[name_idx] = '\0';
-        
-        bool is_directory = (buffer[i + 11] & 0x10) != 0;
-        uint32_t size = *(uint32_t*)(buffer + i + 28);
-        
-        printf("%-20s %-10s %d\n", 
-               name, 
-               is_directory ? "[DIR]" : "[FILE]",
-               is_directory ? 0 : size);
     }
     
-    sys_close(dir_fd);
+    if (count == 0) {
+        printf("Directory is empty\n");
+    } else {
+        printf("\nTotal: %d items\n", count);
+    }
+    
     return 0;
+}
+
+int cmd_cd(int argc, char* argv[]) {
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    if (argc < 2) {
+        // Show current directory
+        char current_path[64];
+        ramfs_get_current_path(current_path, sizeof(current_path));
+        printf("Current directory: %s\n", current_path);
+        return 0;
+    }
+    
+    const char* target = argv[1];
+    
+    // Handle special cases
+    if (shell_strcmp(target, "..") == 0) {
+        // Go to parent directory
+        if (g_ramfs.current_dir != 0) {
+            g_ramfs.current_dir = g_ramfs.files[g_ramfs.current_dir].parent_index;
+        }
+        return 0;
+    } else if (shell_strcmp(target, "/") == 0) {
+        // Go to root
+        g_ramfs.current_dir = 0;
+        return 0;
+    }
+    
+    // Find directory
+    int dir_index = ramfs_find_file(target, g_ramfs.current_dir);
+    if (dir_index < 0) {
+        printf("cd: Directory '%s' not found\n", target);
+        return 1;
+    }
+    
+    if (!g_ramfs.files[dir_index].is_directory) {
+        printf("cd: '%s' is not a directory\n", target);
+        return 1;
+    }
+    
+    g_ramfs.current_dir = dir_index;
+    return 0;
+}
+
+int cmd_pwd(int argc, char* argv[]) {
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    char current_path[64];
+    ramfs_get_current_path(current_path, sizeof(current_path));
+    printf("%s\n", current_path);
+    
+    return 0;
+}
+
+int cmd_mkdir(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: mkdir <directory_name>\n");
+        return 1;
+    }
+    
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    int result = ramfs_create(argv[1], 1); // 1 = directory
+    
+    switch (result) {
+        case -1:
+            printf("mkdir: Directory '%s' already exists\n", argv[1]);
+            return 1;
+        case -2:
+            printf("mkdir: No free slots available\n");
+            return 1;
+        case -3:
+            printf("mkdir: Out of memory\n");
+            return 1;
+        default:
+            if (result >= 0) {
+                printf("Directory '%s' created successfully\n", argv[1]);
+                return 0;
+            } else {
+                printf("mkdir: Unknown error (%d)\n", result);
+                return 1;
+            }
+    }
+}
+
+int cmd_rm(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: rm <filename>\n");
+        return 1;
+    }
+    
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    int result = ramfs_delete(argv[1]);
+    
+    switch (result) {
+        case 0:
+            printf("'%s' deleted successfully\n", argv[1]);
+            return 0;
+        case -1:
+            printf("rm: '%s' not found\n", argv[1]);
+            return 1;
+        case -2:
+            printf("rm: Directory '%s' is not empty\n", argv[1]);
+            return 1;
+        default:
+            printf("rm: Unknown error (%d)\n", result);
+            return 1;
+    }
 }
 
 int cmd_cat(int argc, char* argv[]) {
@@ -596,49 +887,19 @@ int cmd_cat(int argc, char* argv[]) {
         return 1;
     }
     
-    int32_t fd = sys_open(argv[1], OPEN_READ);
-    if (fd < 0) {
-        printf("Error: Could not open file '%s' (error: %d)\n", argv[1], fd);
-        return 1;
-    }
+    if (!g_ramfs.initialized) ramfs_init();
     
-    char buffer[512];
-    int32_t bytes_read;
-    
-    while ((bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[bytes_read] = '\0';
-        printf("%s", buffer);
-    }
+    char buffer[MAX_FILE_SIZE];
+    int bytes_read = ramfs_read_file(argv[1], buffer, sizeof(buffer) - 1);
     
     if (bytes_read < 0) {
-        printf("\nError: Could not read file (error: %d)\n", bytes_read);
-    }
-    
-    sys_close(fd);
-    return 0;
-}
-
-int cmd_mkdir(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: mkdir <directory>\n");
+        printf("cat: Cannot read '%s' (error %d)\n", argv[1], bytes_read);
         return 1;
     }
     
-    printf("mkdir: Directory creation simulated\n");
-    printf("Would create directory: %s\n", argv[1]);
-    printf("Note: Full filesystem not implemented\n");
-    return 0;
-}
-
-int cmd_rm(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: rm <file>\n");
-        return 1;
-    }
+    buffer[bytes_read] = '\0';
+    printf("%s", buffer);
     
-    printf("rm: File deletion simulated\n");
-    printf("Would remove: %s\n", argv[1]);
-    printf("Note: Full filesystem not implemented\n");
     return 0;
 }
 
@@ -648,42 +909,21 @@ int cmd_find(int argc, char* argv[]) {
         return 1;
     }
     
+    if (!g_ramfs.initialized) ramfs_init();
+    
     printf("Searching for files matching '%s':\n", argv[1]);
     
-    int32_t dir_fd = sys_open(".", OPEN_READ);
-    if (dir_fd < 0) {
-        printf("Error: Could not open directory (error: %d)\n", dir_fd);
-        return 1;
-    }
-    
-    char buffer[512];
-    int32_t bytes_read = sys_read(dir_fd, buffer, sizeof(buffer));
-    
-    if (bytes_read < 0) {
-        printf("Error: Could not read directory (error: %d)\n", bytes_read);
-        sys_close(dir_fd);
-        return 1;
-    }
-    
     bool found = false;
-    
-    for (int i = 0; i < bytes_read; i += 32) {
-        char name[13] = {0};
-        shell_memcpy(name, buffer + i, 11);
-        
-        if (name[0] == 0 || (uint8_t)name[0] == 0xE5) continue;
-        
-        bool is_directory = (buffer[i + 11] & 0x10) != 0;
-        
-        if (shell_strstr(name, argv[1]) != NULL) {
-            printf("%s %s\n", 
-                   is_directory ? "[DIR] " : "[FILE] ",
-                   name);
-            found = true;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (g_ramfs.files[i].in_use) {
+            if (shell_strstr(g_ramfs.files[i].name, argv[1]) != NULL) {
+                printf("%s %s\n", 
+                       g_ramfs.files[i].is_directory ? "[DIR] " : "[FILE] ",
+                       g_ramfs.files[i].name);
+                found = true;
+            }
         }
     }
-    
-    sys_close(dir_fd);
     
     if (!found) {
         printf("No files found matching '%s'\n", argv[1]);
@@ -698,57 +938,46 @@ int cmd_grep(int argc, char* argv[]) {
         return 1;
     }
     
-    int32_t fd = sys_open(argv[2], OPEN_READ);
-    if (fd < 0) {
-        printf("Error: Could not open file '%s' (error: %d)\n", argv[2], fd);
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    char buffer[MAX_FILE_SIZE];
+    int bytes_read = ramfs_read_file(argv[2], buffer, sizeof(buffer) - 1);
+    
+    if (bytes_read < 0) {
+        printf("grep: Cannot read '%s'\n", argv[2]);
         return 1;
     }
     
-    char buffer[512];
-    int32_t bytes_read;
-    char line[256];
-    int line_pos = 0;
+    buffer[bytes_read] = '\0';
+    
+    // Search line by line
+    char* line_start = buffer;
     int line_num = 1;
     bool found = false;
     
-    while ((bytes_read = sys_read(fd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[bytes_read] = '\0';
+    while (*line_start) {
+        char* line_end = shell_strchr(line_start, '\n');
         
-        for (int i = 0; i < bytes_read; i++) {
-            if (buffer[i] == '\n' || line_pos >= 255) {
-                line[line_pos] = '\0';
-                
-                if (shell_strstr(line, argv[1]) != NULL) {
-                    printf("%d: %s\n", line_num, line);
-                    found = true;
-                }
-                
-                line_pos = 0;
-                line_num++;
-            } else {
-                line[line_pos++] = buffer[i];
-            }
+        if (line_end) {
+            *line_end = '\0';
         }
-    }
-    
-    // Process the last line if it does not end in \n
-    if (line_pos > 0) {
-        line[line_pos] = '\0';
-        if (shell_strstr(line, argv[1]) != NULL) {
-            printf("%d: %s\n", line_num, line);
+        
+        if (shell_strstr(line_start, argv[1]) != NULL) {
+            printf("%d: %s\n", line_num, line_start);
             found = true;
         }
-    }
-    
-    if (bytes_read < 0) {
-        printf("Error: Could not read file (error: %d)\n", bytes_read);
+        
+        if (!line_end) break;
+        
+        *line_end = '\n';
+        line_start = line_end + 1;
+        line_num++;
     }
     
     if (!found) {
-        printf("Pattern '%s' not found in file '%s'\n", argv[1], argv[2]);
+        printf("Pattern '%s' not found in '%s'\n", argv[1], argv[2]);
     }
     
-    sys_close(fd);
     return 0;
 }
 
@@ -758,50 +987,147 @@ int cmd_wc(int argc, char* argv[]) {
         return 1;
     }
     
-    int32_t fd = sys_open(argv[1], OPEN_READ);
-    if (fd < 0) {
-        printf("Error: Could not open file '%s' (error: %d)\n", argv[1], fd);
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    char buffer[MAX_FILE_SIZE];
+    int bytes_read = ramfs_read_file(argv[1], buffer, sizeof(buffer) - 1);
+    
+    if (bytes_read < 0) {
+        printf("wc: Cannot read '%s'\n", argv[1]);
         return 1;
     }
     
-    char buffer[512];
-    int32_t bytes_read;
-    int lines = 0, words = 0, chars = 0;
+    buffer[bytes_read] = '\0';
+    
+    int lines = 0, words = 0, chars = bytes_read;
     bool in_word = false;
     
-    while ((bytes_read = sys_read(fd, buffer, sizeof(buffer))) > 0) {
-        for (int i = 0; i < bytes_read; i++) {
-            chars++;
-            
-            if (buffer[i] == '\n') {
-                lines++;
+    for (int i = 0; i < bytes_read; i++) {
+        if (buffer[i] == '\n') {
+            lines++;
+        }
+        
+        if (buffer[i] == ' ' || buffer[i] == '\t' || buffer[i] == '\n') {
+            if (in_word) {
+                words++;
+                in_word = false;
             }
-            
-            if (buffer[i] == ' ' || buffer[i] == '\t' || buffer[i] == '\n') {
-                if (in_word) {
-                    words++;
-                    in_word = false;
-                }
-            } else {
-                in_word = true;
-            }
+        } else {
+            in_word = true;
         }
     }
     
-    // Count the last word if the file does not end with a space
+    // Count last word if file doesn't end with whitespace
     if (in_word) {
         words++;
     }
     
-    if (bytes_read < 0) {
-        printf("Error: Could not read file (error: %d)\n", bytes_read);
-        sys_close(fd);
+    printf("  %d  %d  %d  %s\n", lines, words, chars, argv[1]);
+    
+    return 0;
+}
+
+int cmd_touch(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: touch <filename>\n");
         return 1;
     }
     
-    printf("  %d  %d  %d  %s\n", lines, words, chars, argv[1]);
+    if (!g_ramfs.initialized) ramfs_init();
     
-    sys_close(fd);
+    // Check if file exists
+    if (ramfs_find_file(argv[1], g_ramfs.current_dir) >= 0) {
+        printf("File '%s' already exists\n", argv[1]);
+        return 0;
+    }
+    
+    // Create empty file
+    int result = ramfs_write_file(argv[1], "", 0);
+    if (result >= 0) {
+        printf("Empty file '%s' created\n", argv[1]);
+        return 0;
+    } else {
+        printf("touch: Cannot create '%s' (error %d)\n", argv[1], result);
+        return 1;
+    }
+}
+
+int cmd_edit(int argc, char* argv[]) {
+    if (argc < 2) {
+        printf("Usage: edit <filename>\n");
+        return 1;
+    }
+    
+    if (!g_ramfs.initialized) ramfs_init();
+    
+    char* filename = argv[1];
+    
+    // Try to read existing file
+    char buffer[MAX_FILE_SIZE];
+    int bytes_read = ramfs_read_file(filename, buffer, sizeof(buffer) - 1);
+    
+    if (bytes_read >= 0) {
+        buffer[bytes_read] = '\0';
+        printf("Editing existing file '%s' (%d bytes)\n", filename, bytes_read);
+        printf("Current content:\n%s\n", buffer);
+    } else {
+        printf("Creating new file '%s'\n", filename);
+        buffer[0] = '\0';
+    }
+    
+    printf("\n=== Simple Editor ===\n");
+    printf("Enter text (type 'SAVE' on new line to save, 'QUIT' to exit):\n\n");
+    
+    char edit_buffer[MAX_FILE_SIZE];
+    int content_length = 0;
+    char line_buffer[256];
+    
+    // Copy existing content if any
+    if (bytes_read > 0) {
+        shell_memcpy(edit_buffer, buffer, bytes_read);
+        content_length = bytes_read;
+    }
+    
+    while (1) {
+        printf("> ");
+        shell_memset(line_buffer, 0, sizeof(line_buffer));
+        
+        // Read input line
+        int i = 0;
+        char c;
+        while (i < 255) {
+            c = shell_getc();
+            if (c == '\n') break;
+            line_buffer[i++] = c;
+        }
+        line_buffer[i] = '\0';
+        
+        if (shell_strcmp(line_buffer, "SAVE") == 0) {
+            int result = ramfs_write_file(filename, edit_buffer, content_length);
+            if (result >= 0) {
+                printf("File '%s' saved (%d bytes)\n", filename, result);
+            } else {
+                printf("Error saving file: %d\n", result);
+            }
+            break;
+        } else if (shell_strcmp(line_buffer, "QUIT") == 0) {
+            printf("Editor exited without saving\n");
+            break;
+        }
+        
+        // Add line to buffer
+        int line_len = shell_strlen(line_buffer);
+        if (content_length + line_len + 2 < MAX_FILE_SIZE) {
+            shell_memcpy(edit_buffer + content_length, line_buffer, line_len);
+            content_length += line_len;
+            edit_buffer[content_length++] = '\n';
+            edit_buffer[content_length] = '\0';
+        } else {
+            printf("Error: File size limit reached (%d bytes)\n", MAX_FILE_SIZE);
+            break;
+        }
+    }
+    
     return 0;
 }
 
@@ -845,13 +1171,31 @@ int cmd_memtest(int argc, char* argv[]) {
 
 int cmd_ports(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Usage: ports <read|write> [port] [value]\n");
-        printf("  ports read 0x3f8      - Read from port 0x3f8\n");
-        printf("  ports write 0x3f8 65  - Write 65 to port 0x3f8\n");
+        printf("ports: Hardware port access utility\n");
+        printf("Usage:\n");
+        printf("  ports list               - List common I/O ports\n"); 
+        printf("  ports read <port>        - Read byte from port (hex)\n");
+        printf("  ports write <port> <val> - Write byte to port\n");
+        printf("  ports info <port>        - Get information about port\n");
         return 1;
     }
     
-    if (shell_strcmp(argv[1], "read") == 0) {
+    if (shell_strcmp(argv[1], "list") == 0) {
+        printf("Common I/O Ports:\n");
+        printf("  Port    Device/Function\n");
+        printf("  ----    ---------------\n");
+        printf("  0x20    PIC 1 Command\n");
+        printf("  0x21    PIC 1 Data\n");
+        printf("  0x40    PIT Channel 0 (Timer)\n");
+        printf("  0x43    PIT Command\n");
+        printf("  0x60    PS/2 Keyboard Data\n");
+        printf("  0x64    PS/2 Keyboard Status/Command\n");
+        printf("  0x70    CMOS/RTC Address\n");
+        printf("  0x71    CMOS/RTC Data\n");
+        printf("  0x3F8   Serial Port 1 (COM1)\n");
+        printf("  0x3FC   Serial Port 1 Control\n");
+        
+    } else if (shell_strcmp(argv[1], "read") == 0) {
         if (argc < 3) {
             printf("Usage: ports read <port>\n");
             return 1;
@@ -859,7 +1203,7 @@ int cmd_ports(int argc, char* argv[]) {
         
         uint16_t port = hex_str_to_int(argv[2]);
         uint8_t value = i686_inb(port);
-        printf("Port 0x%04X = 0x%02X (%d)\n", port, value, value);
+        printf("Read from port 0x%04X: 0x%02X (%d)\n", port, value, value);
         
     } else if (shell_strcmp(argv[1], "write") == 0) {
         if (argc < 4) {
@@ -868,13 +1212,46 @@ int cmd_ports(int argc, char* argv[]) {
         }
         
         uint16_t port = hex_str_to_int(argv[2]);
-        uint8_t value = dec_str_to_int(argv[3]);
+        uint8_t value = (uint8_t)dec_str_to_int(argv[3]);
         
         i686_outb(port, value);
         printf("Wrote 0x%02X (%d) to port 0x%04X\n", value, value, port);
         
+    } else if (shell_strcmp(argv[1], "info") == 0) {
+        if (argc < 3) {
+            printf("Usage: ports info <port>\n");
+            return 1;
+        }
+        
+        uint16_t port = hex_str_to_int(argv[2]);
+        printf("Port 0x%04X information:\n", port);
+        
+        switch (port) {
+            case 0x20:
+                printf("  PIC 1 Command Port\n");
+                printf("  Used for interrupt controller configuration\n");
+                break;
+            case 0x21:
+                printf("  PIC 1 Data Port\n");
+                printf("  Used for interrupt mask configuration\n");
+                break;
+            case 0x60:
+                printf("  PS/2 Keyboard Data Port\n");
+                printf("  Receives scan codes from keyboard\n");
+                break;
+            case 0x64:
+                printf("  PS/2 Keyboard Status/Command Port\n");
+                printf("  Used for keyboard controller communication\n");
+                break;
+            default:
+                printf("  Unknown or undocumented port\n");
+                printf("  Current value: 0x%02X\n", i686_inb(port));
+                break;
+        }
+        
     } else {
-        printf("Invalid operation: %s\n", argv[1]);
+        printf("ports: Unknown command '%s'\n", argv[1]);
+        printf("Use 'ports' without arguments for help.\n");
         return 1;
     }
     
@@ -908,49 +1285,96 @@ int cmd_interrupt(int argc, char* argv[]) {
 
 int cmd_hexdump(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Usage: hexdump <filename>\n");
+        printf("Usage: hexdump <filename_or_address> [length]\n");
+        printf("Examples:\n");
+        printf("  hexdump test.txt     - Dump file content\n");
+        printf("  hexdump 0x100000     - Dump 256 bytes from memory\n");
         return 1;
     }
     
-    int32_t fd = sys_open(argv[1], OPEN_READ);
-    if (fd < 0) {
-        printf("Error: Could not open file '%s' (error: %d)\n", argv[1], fd);
-        return 1;
-    }
+    if (!g_ramfs.initialized) ramfs_init();
     
-    char buffer[16];
-    int32_t bytes_read;
-    uint32_t offset = 0;
-    
-    while ((bytes_read = sys_read(fd, buffer, sizeof(buffer))) > 0) {
-        printf("%08x  ", offset);
+    // Check if it's a memory address (starts with 0x) or filename
+    if (argv[1][0] == '0' && argv[1][1] == 'x') {
+        // Memory dump
+        uint32_t address = hex_str_to_int(argv[1]);
+        uint32_t length = 256;
         
-        for (int i = 0; i < 16; i++) {
-            if (i < bytes_read) {
-                printf("%02x ", (uint8_t)buffer[i]);
-            } else {
-                printf("   ");
+        if (argc > 2) {
+            length = dec_str_to_int(argv[2]);
+        }
+        
+        if (length > 4096) {
+            printf("Warning: Length limited to 4096 bytes\n");
+            length = 4096;
+        }
+        
+        printf("Hexdump of memory at 0x%08X (%d bytes):\n\n", address, length);
+        
+        uint8_t* memory = (uint8_t*)address;
+        uint32_t offset = 0;
+        
+        while (offset < length) {
+            printf("%08x  ", address + offset);
+            
+            for (int i = 0; i < 16 && offset + i < length; i++) {
+                printf("%02x ", memory[offset + i]);
+                if (i == 7) printf(" ");
             }
             
-            if (i == 7) printf(" ");
+            for (int i = offset + 16 > length ? length - offset : 16; i < 16; i++) {
+                printf("   ");
+                if (i == 7) printf(" ");
+            }
+            
+            printf(" |");
+            
+            for (int i = 0; i < 16 && offset + i < length; i++) {
+                uint8_t byte = memory[offset + i];
+                printf("%c", (byte >= 32 && byte <= 126) ? byte : '.');
+            }
+            
+            printf("|\n");
+            offset += 16;
+        }
+    } else {
+        // File dump
+        char buffer[MAX_FILE_SIZE];
+        int bytes_read = ramfs_read_file(argv[1], buffer, sizeof(buffer));
+        
+        if (bytes_read < 0) {
+            printf("hexdump: Cannot read '%s'\n", argv[1]);
+            return 1;
         }
         
-        printf(" |");
+        printf("Hexdump of file '%s' (%d bytes):\n\n", argv[1], bytes_read);
         
-        for (int i = 0; i < bytes_read; i++) {
-            char c = buffer[i];
-            printf("%c", (c >= 32 && c <= 126) ? c : '.');
+        uint32_t offset = 0;
+        while (offset < bytes_read) {
+            printf("%08x  ", offset);
+            
+            for (int i = 0; i < 16 && offset + i < bytes_read; i++) {
+                printf("%02x ", (uint8_t)buffer[offset + i]);
+                if (i == 7) printf(" ");
+            }
+            
+            for (int i = offset + 16 > bytes_read ? bytes_read - offset : 16; i < 16; i++) {
+                printf("   ");
+                if (i == 7) printf(" ");
+            }
+            
+            printf(" |");
+            
+            for (int i = 0; i < 16 && offset + i < bytes_read; i++) {
+                uint8_t byte = (uint8_t)buffer[offset + i];
+                printf("%c", (byte >= 32 && byte <= 126) ? byte : '.');
+            }
+            
+            printf("|\n");
+            offset += 16;
         }
-        
-        printf("|\n");
-        offset += bytes_read;
     }
     
-    if (bytes_read < 0) {
-        printf("Error: Could not read file (error: %d)\n", bytes_read);
-    }
-    
-    sys_close(fd);
     return 0;
 }
 
@@ -1086,7 +1510,6 @@ int cmd_syscall_test(int argc, char* argv[]) {
         printf("  all       - Run comprehensive test suite\n");
         printf("  basic     - Test basic syscalls (print, getpid, time)\n");
         printf("  memory    - Test malloc/free operations\n");
-        printf("  files     - Test file I/O operations\n");
         printf("  heap      - Test heap integrity\n");
         printf("  stress    - Run stress tests\n");
         return 1;
@@ -1130,41 +1553,6 @@ int cmd_syscall_test(int argc, char* argv[]) {
             printf("  Free ptr2 result: %d\n", free2);
         }
         
-    } else if (shell_strcmp(argv[1], "files") == 0) {
-        printf("=== File Syscall Test ===\n\n");
-        
-        printf("Opening existing file 'welcome.txt':\n");
-        int32_t fd = sys_open("welcome.txt", OPEN_READ);
-        printf("  File descriptor: %d\n", fd);
-        
-        if (fd >= 0) {
-            char buffer[200];
-            shell_memset(buffer, 0, sizeof(buffer));
-            int32_t bytes = sys_read(fd, buffer, sizeof(buffer) - 1);
-            printf("  Read %d bytes:\n%s\n", bytes, buffer);
-            sys_close(fd);
-        }
-        
-        printf("Creating new file 'shell_test.txt':\n");
-        fd = sys_open("shell_test.txt", OPEN_CREATE | OPEN_WRITE);
-        printf("  File descriptor: %d\n", fd);
-        
-        if (fd >= 0) {
-            const char* data = "This file was created from the shell!\nUsing syscalls for file operations.\n";
-            int32_t written = sys_write(fd, data, strlen(data));
-            printf("  Wrote %d bytes\n", written);
-            sys_close(fd);
-            
-            fd = sys_open("shell_test.txt", OPEN_READ);
-            if (fd >= 0) {
-                char buffer[200];
-                shell_memset(buffer, 0, sizeof(buffer));
-                int32_t bytes = sys_read(fd, buffer, sizeof(buffer) - 1);
-                printf("  Reading back file (%d bytes):\n%s\n", bytes, buffer);
-                sys_close(fd);
-            }
-        }
-        
     } else if (shell_strcmp(argv[1], "heap") == 0) {
         syscall_test_heap_integrity();
         
@@ -1183,25 +1571,6 @@ int cmd_syscall_test(int argc, char* argv[]) {
             }
         }
         printf("  Success: %d, Failed: %d\n\n", success, failed);
-        
-        printf("File stress test (creating 10 files):\n");
-        char filename[32];
-        success = 0;
-        failed = 0;
-        for (int i = 0; i < 10; i++) {
-            shell_snprintf(filename, sizeof(filename), "stress_%d.txt", i);
-            int32_t fd = sys_open(filename, OPEN_CREATE | OPEN_WRITE);
-            if (fd >= 0) {
-                success++;
-                char data[64];
-                shell_snprintf(data, sizeof(data), "Stress test file #%d\n", i);
-                sys_write(fd, data, strlen(data));
-                sys_close(fd);
-            } else {
-                failed++;
-            }
-        }
-        printf("  Success: %d, Failed: %d\n", success, failed);
         
     } else {
         printf("Unknown test type: %s\n", argv[1]);
@@ -1289,39 +1658,49 @@ int cmd_syscall_info(int argc, char* argv[]) {
     printf("=== System Call Information ===\n\n");
     
     printf("Syscall Interface:\n");
-    printf("  Interrupt vector: 0x80\n");
-    printf("  Total syscalls: %d\n", SYSCALL_COUNT);
-    printf("  Calling convention: EAX=syscall_num, EBX=arg1, ECX=arg2, EDX=arg3, ESI=arg4\n");
+    printf("  Interrupt Vector: 0x80 (128)\n");
+    printf("  Total Available: %d system calls\n", SYSCALL_COUNT);
+    printf("  Calling Convention: Software interrupt\n");
+    printf("  Parameters: EAX=number, EBX=arg1, ECX=arg2, EDX=arg3, ESI=arg4\n");
+    printf("  Return Value: EAX register\n\n");
     
-    printf("\nImplemented System Calls:\n");
-    printf("  %-2s %-15s %s\n", "ID", "Name", "Description");
-    printf("  %-2s %-15s %s\n", "--", "----", "-----------");
-    printf("  %-2d %-15s %s\n", 0, "exit", "Exit process with code");
-    printf("  %-2d %-15s %s\n", 1, "print", "Print message to console");
-    printf("  %-2d %-15s %s\n", 2, "read", "Read from file descriptor");
-    printf("  %-2d %-15s %s\n", 3, "malloc", "Allocate memory");
-    printf("  %-2d %-15s %s\n", 4, "free", "Free allocated memory");
-    printf("  %-2d %-15s %s\n", 5, "open", "Open file");
-    printf("  %-2d %-15s %s\n", 6, "close", "Close file descriptor");
-    printf("  %-2d %-15s %s\n", 7, "write", "Write to file descriptor");
-    printf("  %-2d %-15s %s\n", 8, "seek", "Seek in file (placeholder)");
-    printf("  %-2d %-15s %s\n", 9, "getpid", "Get process ID");
-    printf("  %-2d %-15s %s\n", 10, "time", "Get current time");
-    printf("  %-2d %-15s %s\n", 11, "sleep", "Sleep for milliseconds");
-    printf("  %-2d %-15s %s\n", 12, "yield", "Yield to scheduler");
+    printf("Implemented System Calls:\n");
+    printf("  %-3s %-15s %s\n", "ID", "Name", "Description");
+    printf("  %-3s %-15s %s\n", "---", "----", "-----------");
+    printf("  %-3d %-15s %s\n", 0, "exit", "Exit process with status code");
+    printf("  %-3d %-15s %s\n", 1, "print", "Print string to console");
+    printf("  %-3d %-15s %s\n", 2, "read", "Read data from descriptor");
+    printf("  %-3d %-15s %s\n", 3, "malloc", "Allocate memory block");
+    printf("  %-3d %-15s %s\n", 4, "free", "Release memory block");
+    printf("  %-3d %-15s %s\n", 5, "open", "Open file descriptor");
+    printf("  %-3d %-15s %s\n", 6, "close", "Close file descriptor");
+    printf("  %-3d %-15s %s\n", 7, "write", "Write data to descriptor");
+    printf("  %-3d %-15s %s\n", 8, "seek", "Set file position (stub)");
+    printf("  %-3d %-15s %s\n", 9, "getpid", "Get process identifier");
+    printf("  %-3d %-15s %s\n", 10, "time", "Get system time in ticks");
+    printf("  %-3d %-15s %s\n", 11, "sleep", "Sleep for milliseconds");
+    printf("  %-3d %-15s %s\n", 12, "yield", "Yield CPU time slice");
     
-    printf("\nError Codes:\n");
-    printf("  %2d - SYSCALL_OK\n", 0);
-    printf("  %2d - SYSCALL_ERROR\n", -1);
-    printf("  %2d - SYSCALL_INVALID_SYSCALL\n", -2);
-    printf("  %2d - SYSCALL_INVALID_PARAMS\n", -3);
-    printf("  %2d - SYSCALL_PERMISSION_DENIED\n", -4);
-    printf("  %2d - SYSCALL_NOT_FOUND\n", -5);
-    printf("  %2d - SYSCALL_OUT_OF_MEMORY\n", -6);
+    printf("\nReturn Codes:\n");
+    printf("  %-3d - SYSCALL_OK (Success)\n", 0);
+    printf("  %-3d - SYSCALL_ERROR (General error)\n", -1);
+    printf("  %-3d - SYSCALL_INVALID_SYSCALL (Unknown call)\n", -2);
+    printf("  %-3d - SYSCALL_INVALID_PARAMS (Bad parameters)\n", -3);
+    printf("  %-3d - SYSCALL_PERMISSION_DENIED (Access denied)\n", -4);
+    printf("  %-3d - SYSCALL_NOT_FOUND (Resource not found)\n", -5);
+    printf("  %-3d - SYSCALL_OUT_OF_MEMORY (Memory exhausted)\n", -6);
     
-    printf("\nUsage examples:\n");
+    printf("\nMemory Management:\n");
+    printf("  Heap Start: 0x400000 (4MB)\n");
+    printf("  Heap Size: 1048576 bytes (1MB)\n");
+    printf("  Block Size: 32 bytes minimum\n");
+    printf("  Algorithm: Simple linked list allocator\n");
+    
+    printf("\nUsage Examples:\n");
     printf("  syscall_test basic     - Test basic functionality\n");
-    printf("  malloc_test 1024       - Test memory allocation\n");
+    printf("  syscall_test memory    - Test malloc/free operations\n");
+    printf("  malloc_test 1024       - Allocate 1KB test block\n");
+    printf("  sleep 1000             - Sleep for 1 second\n");
     
     return 0;
 }
@@ -1393,144 +1772,7 @@ int cmd_panic(int argc, char* argv[]) {
 }
 
 //
-// File Editing Commands
-//
-
-int cmd_create_file(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: create_file <filename> [content]\n");
-        return 1;
-    }
-
-    char* filename = argv[1];
-    int fd = sys_open(filename, OPEN_WRITE | OPEN_CREATE | OPEN_TRUNCATE);
-    if (fd < 0) {
-        printf("Error: Could not create file '%s'\n", filename);
-        return 1;
-    }
-
-    // If content is provided, write it to the file
-    if (argc > 2) {
-        char* content = argv[2];
-        int len = shell_strlen(content);
-        int written = sys_write(fd, content, len);
-        if (written < len) {
-            printf("Warning: Only wrote %d of %d bytes\n", written, len);
-        }
-    } else {
-        // Interactive mode - allow user to enter content
-        printf("Enter file content (press Ctrl+D on empty line to finish):\n");
-        char buffer[256];
-        int line_count = 0;
-        
-        while (1) {
-            printf("%d> ", line_count + 1);
-            // Use shell_memset instead of memset
-            shell_memset(buffer, 0, sizeof(buffer));
-            
-            // Read a line of input
-            int i = 0;
-            char c;
-            while (i < 255) {
-                c = shell_getc();
-                if (c == '\n') break;
-                // Check for Ctrl+D (EOT)
-                if (c == 4 && i == 0) {
-                    goto end_input;
-                }
-                buffer[i++] = c;
-            }
-            buffer[i] = '\n';
-            
-            // Write the line to the file
-            sys_write(fd, buffer, i + 1);
-            line_count++;
-        }
-        
-    end_input:
-        printf("\nFile saved with %d lines.\n", line_count);
-    }
-
-    sys_close(fd);
-    printf("File '%s' created successfully.\n", filename);
-    return 0;
-}
-
-int cmd_edit(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Usage: edit <filename>\n");
-        return 1;
-    }
-
-    char* filename = argv[1];
-    
-    // Try to open the file for reading first
-    int fd = sys_open(filename, OPEN_READ);
-    if (fd < 0) {
-        printf("Creating new file: '%s'\n", filename);
-    } else {
-        // Read the file content
-        char buffer[4096];
-        int size = sys_read(fd, buffer, sizeof(buffer) - 1);
-        if (size < 0) {
-            printf("Error reading file '%s'\n", filename);
-            sys_close(fd);
-            return 1;
-        }
-        buffer[size] = '\0';
-        sys_close(fd);
-        
-        // Display the file content
-        printf("File content (%d bytes):\n", size);
-        printf("%s\n", buffer);
-    }
-    
-    // Open the file for writing
-    fd = sys_open(filename, OPEN_WRITE | OPEN_CREATE | OPEN_TRUNCATE);
-    if (fd < 0) {
-        printf("Error: Could not open file '%s' for writing\n", filename);
-        return 1;
-    }
-    
-    // Simple editor
-    printf("\n--- Simple Text Editor ---\n");
-    printf("Enter text line by line. Press Ctrl+D on an empty line to save and exit.\n");
-    
-    char buffer[256];
-    int line_count = 0;
-    
-    while (1) {
-        printf("%d> ", line_count + 1);
-        // Zero out buffer
-        shell_memset(buffer, 0, sizeof(buffer));
-        
-        // Read a line of input
-        int i = 0;
-        char c;
-        while (i < 255) {
-            c = shell_getc();
-            if (c == '\n') break;
-            // Check for Ctrl+D (EOT)
-            if (c == 4 && i == 0) {
-                goto end_edit;
-            }
-            buffer[i++] = c;
-        }
-        buffer[i] = '\n';
-        
-        // Write the line to the file
-        sys_write(fd, buffer, i + 1);
-        line_count++;
-    }
-    
-end_edit:
-    sys_close(fd);
-    printf("\nFile '%s' saved with %d lines.\n", filename, line_count);
-    return 0;
-}
-
-//
-// Command Table
+// COMMAND TABLE - ALL COMMANDS RESTORED
 //
 
 const ShellCommandEntry shell_commands[] = {
@@ -1547,25 +1789,27 @@ const ShellCommandEntry shell_commands[] = {
     {"uptime",          "Show system uptime",                               cmd_uptime},
     {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
     {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
-    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod}, //FIXME:
+    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod}, // DELETE
     {"dmesg",           "Show kernel messages",                             cmd_dmesg},
     
-    // File System
-    {"ls",              "List directory contents",                          cmd_ls}, // FIXME:
-    {"cat",             "Display file contents",                            cmd_cat}, // FIXME:
-    {"mkdir",           "Create directory",                                 cmd_mkdir}, // FIXME:
-    {"rm",              "Remove file or directory",                         cmd_rm}, // FIXME:
-    {"find",            "Find files by name pattern",                       cmd_find}, // FIXME:
+    // File System (RAM-based - SEMIFUNCTIONAL)
+    {"ls",              "List directory contents",                          cmd_ls}, //FIXME:
+    {"cd",              "Change directory",                                 cmd_cd},
+    {"pwd",             "Print working directory",                          cmd_pwd},
+    {"mkdir",           "Create directory",                                 cmd_mkdir},
+    {"rm",              "Remove file or directory",                         cmd_rm},
+    {"cat",             "Display file contents",                            cmd_cat},
+    {"edit",            "Edit text file",                                   cmd_edit}, //FIXME:
+    {"touch",           "Create empty file",                                cmd_touch},
+    {"find",            "Find files by name pattern",                       cmd_find},
     {"grep",            "Search text in files",                             cmd_grep},
-    {"wc",              "Count lines, words and characters",                cmd_wc}, // FIXME: ALMOST
-    {"create_file",     "Create a new file",                                cmd_create_file}, // GET THE EDIT MODE OUT OF HERE --- GET OUT!!!
-    {"edit",            "Edit a text file",                                 cmd_edit}, // FIXME:
+    {"wc",              "Count lines, words and characters",                cmd_wc},
     
     // Hardware & Debug
     {"memtest",         "Run basic memory test",                            cmd_memtest},
-    {"ports",           "Read/write I/O ports",                             cmd_ports}, // FIXME:
+    {"ports",           "Hardware port access utility",                     cmd_ports}, // DELETE
     {"interrupt",       "Control interrupt state",                          cmd_interrupt},
-    {"hexdump",         "Display memory in hexadecimal",                    cmd_hexdump},
+    {"hexdump",         "Display file/memory in hexadecimal",               cmd_hexdump},
     {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest}, // FIXME:
     {"benchmark",       "Run CPU benchmark",                                cmd_benchmark},
     {"registers",       "Show CPU register values",                         cmd_registers},
@@ -1574,19 +1818,19 @@ const ShellCommandEntry shell_commands[] = {
     {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
     {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
     {"heap_info",       "Show heap information and test",                   cmd_heap_info},
-    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, // FIXME:
+    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, //FIXME:
     {"sleep",           "Test sleep syscall",                               cmd_sleep_test},
     
     // System Control
     {"reboot",          "Restart the system",                               cmd_reboot},
-    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic},
+    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic}, // TODO: ADD EXIT COMMAND
     
     // Terminator
     {NULL, NULL, NULL}
 };
 
 //
-// Auxiliary Functions For Command Management
+// COMMAND MANAGEMENT FUNCTIONS
 //
 
 int get_shell_command_count(void) {

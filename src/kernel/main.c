@@ -112,7 +112,7 @@ void display_kernel_messages(void) {
         return;
     }
     
-    puts("=== Kernel Messages ===");
+    puts("=== Kernel Messages ===\n");
     
     // Display each message
     for (int i = 0; i < ultra_msg_idx && i < SIMPLE_MSG_COUNT; i++) {
@@ -158,7 +158,7 @@ void display_kernel_messages(void) {
         putc('1');
         putc('0' + (ultra_msg_idx - 10));
     }
-    puts(" shown) ===");
+    puts(" shown) ===\n");
 }
 
 void dmesg_clear(void) {

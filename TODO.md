@@ -5,7 +5,6 @@
 - [ ] Add scrolling support to shell
 ## Shell Commands
 FIXME:
-- [ ] cmd_dmesg
 - [ ] cmd_ls
 - [ ] cmd_mkdir
 - [ ] cmd_rm
@@ -13,5 +12,8 @@ FIXME:
 - [ ] cmd_grep
 - [ ] cmd_ports
 - [ ] cmd_syscall_info
+- [ ] touch and edit
 TODO:
 - [ ] history
+DELETE:
+- [ ] cmd_lsmod
