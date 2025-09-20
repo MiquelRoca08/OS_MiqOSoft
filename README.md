@@ -34,28 +34,28 @@ Minimalist operating system developed as a personal project.
 ---
 
 ## Project Structure
-
+```
 .
-├── include/ # Public headers (kernel, bootloader, drivers, etc.)
+├── include/
 ├── src/
-│ ├── bootloader/
-│ │ ├── stage1/
-│ │ └── stage2/
-│ ├── kernel/
-│ │ ├── arch/i686/
-│ │ ├── drivers/
-│ │ ├── hal/
-│ │ └── util/
-│ └── libs/
-│ └── core/ # Refactored part of the project in C++
-├── tools/ # Development tools and custom utilities
-├── build_scripts/ # Build and image generation support scripts
-├── image/ # Disk/floppy image creation and management
-├── scripts/ # Helper scripts for running, debugging, etc.
-├── SConstruct # Main build configuration with SCons
-├── requirements.txt # External dependencies
-└── TODO.md # Pending tasks and improvement ideas
-
+│   ├── bootloader/
+│   │   ├── stage1/
+│   │   └── stage2/
+│   ├── kernel/
+│   │   ├── arch/i686/
+│   │   ├── drivers/
+│   │   ├── hal/
+│   │   └── util/
+│   └── libs/
+│       └── core/
+├── tools/
+├── build_scripts/
+├── image/
+├── scripts/
+├── SConstruct
+├── requirements.txt
+└── TODO.md
+```
 ---
 
 ## Prerequisites
@@ -80,20 +80,32 @@ echo 'export LIBGUESTFS_BACKEND_SETTINGS=force_tcg' >> ~/.bashrc
 source ~/.bashrc
 ```
 ---
+
+## Toolchain
+The project uses a custom cross-compiler toolchain for i686-elf target. The toolchain is automatically built when needed.
+```
+# Build toolchain manually
+scons toolchain
+```
+
 ## Building
+```
 sudo scons
 # For debug build
 sudo scons config=debug arch=i686 imageType=disk
-
+```
 ## Running
+```
 sudo scons run         # Run in QEMU
 sudo scons bochs       # Run in Bochs (debugging)
 ./scripts/debug.sh     # Detailed debug output
+```
 
-Note on sudo permissions:
-Root privileges are required to create and mount disk images, and for accessing the disk device in some emulators, especially when using libguestfs.
+>Note on sudo permissions:
+>Root privileges are required to create and mount disk images, and for accessing the disk device in some emulators, especially when using libguestfs.
 
 ## Demo
 
 To see the OS in action, I’ve uploaded several demonstrations on my YouTube channel, where the main features can be observed running on real builds.
 https://www.youtube.com/@miquelroca08
+
