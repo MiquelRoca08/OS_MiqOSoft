@@ -20,3 +20,7 @@ uint8_t inb(uint16_t port) {
 void io_wait(void) {
     __asm__ volatile ("outb %%al, $0x80" : : "a"(0));
 }
+
+void __attribute__((cdecl)) i686_hlt(void) {
+    __asm__ volatile ("hlt\n");
+}

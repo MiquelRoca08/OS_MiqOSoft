@@ -17,7 +17,7 @@ void pit_init(uint32_t frequency) {
     
     log_debug("PIT", "Input frequency: %d Hz", PIT_INPUT_HZ);
     log_debug("PIT", "Requested frequency: %d Hz", frequency);
-    log_debug("PIT", "Calculated divisor: %d (0x%04X)", divisor, divisor);
+    log_debug("PIT", "Calculated divisor: %d (0x%X)", divisor, divisor);
     log_debug("PIT", "Actual frequency will be: %d Hz", PIT_INPUT_HZ / divisor);
     
     // Debug: Check if divisor is correct for 1000Hz

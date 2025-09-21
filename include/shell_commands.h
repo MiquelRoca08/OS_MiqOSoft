@@ -57,6 +57,7 @@ int cmd_sleep_test(int argc, char* argv[]);
 // System Control
 int cmd_reboot(int argc, char* argv[]);
 int cmd_panic(int argc, char* argv[]);
+int cmd_exit(int argc, char* argv[]);
 
 //
 // Command Table And Management Functions

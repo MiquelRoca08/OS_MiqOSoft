@@ -301,8 +301,7 @@ void start(BootParams* bootParams)
     kernel_add_message('I', "demo", "Logging test complete");
     
     // STEP 8: User interface
-    printf("OS MiqOSoft v0.18.5\n");
-    printf("This operating system is under construction.\n");
+    printf("Welcome to OS MiqOSosft v1.0\n");
     printf("\n");
     
     kernel_add_message('I', "ui", "Console ready");

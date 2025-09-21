@@ -466,6 +466,13 @@ void keyboard_reset_dead_state(void) {
     dead_key_state = DEAD_NONE;
 }
 
+// Clear the keyboard circular buffer (drop any pending characters)
+void keyboard_clear_buffer(void) {
+    kb_head = 0;
+    kb_tail = 0;
+    dead_key_state = DEAD_NONE;
+}
+
 // Additional utility functions
 int keyboard_is_caps_lock_on(void) {
     return caps_lock;

@@ -35,7 +35,7 @@ static void heap_init(void) {
     heap_start->next = NULL;
     heap_initialized = 1;
     
-    log_info("Syscall", "Heap initialized at 0x%08X, size: %d bytes", HEAP_START, HEAP_SIZE);
+    log_info("Syscall", "Heap initialized at 0x%X, size: %d bytes", HEAP_START, HEAP_SIZE);
 }
 
 // Simple virtual file system (for file syscalls)

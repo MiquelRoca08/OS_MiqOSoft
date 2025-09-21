@@ -29,7 +29,9 @@ Minimalist operating system developed as a personal project.
   - File system operations  
   - Memory and process inspection  
   - System call testing interface  
-  - Command history and line editing  
+- Basic text editor for file creation and modification  
+- Demonstration programs showcasing system capabilities
+- Exit command to power off the machine gracefully in supported emulators (QEMU, Bochs)
 
 ---
 
@@ -108,4 +110,3 @@ sudo scons bochs       # Run in Bochs (debugging)
 
 To see the OS in action, I’ve uploaded several demonstrations on my YouTube channel, where the main features can be observed running on real builds.
 https://www.youtube.com/@miquelroca08
-

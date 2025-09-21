@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <shell.h>
 #include <shell_commands.h>
 #include <string.h>
@@ -528,7 +529,7 @@ int cmd_echo(int argc, char* argv[]) {
 }
 
 int cmd_version(int argc, char* argv[]) {
-    printf("MiqOSoft Kernel v0.18.5\n");
+    printf("MiqOSoft Kernel v1.0\n");
     printf("Architecture: i686 (32-bit)\n");
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
@@ -561,7 +562,7 @@ int cmd_memory(int argc, char* argv[]) {
     const uint32_t HEAP_SIZE = 0x100000;     // 1MB
     const uint32_t BLOCK_SIZE = 32;          // Minimum block size
     
-    printf("  Heap Start: 0x%08X (%dMB)\n", HEAP_START, HEAP_START / 1048576);
+    printf("  Heap Start: 0x%X (%dMB)\n", HEAP_START, HEAP_START / 1048576);
     printf("  Heap Size: %dKB (%d bytes)\n", HEAP_SIZE / 1024, HEAP_SIZE);
     printf("  Block Size: %d bytes\n", BLOCK_SIZE);
     
@@ -574,9 +575,9 @@ int cmd_memory(int argc, char* argv[]) {
     printf("\nHeap Status Test:\n");
     
     if (test_ptr1 && test_ptr2 && test_ptr3) {
-        printf("  Test allocation 1: 0x%08X (1KB)\n", (uint32_t)test_ptr1);
-        printf("  Test allocation 2: 0x%08X (2KB)\n", (uint32_t)test_ptr2);
-        printf("  Test allocation 3: 0x%08X (4KB)\n", (uint32_t)test_ptr3);
+        printf("  Test allocation 1: 0x%X (1KB)\n", (uint32_t)test_ptr1);
+        printf("  Test allocation 2: 0x%X (2KB)\n", (uint32_t)test_ptr2);
+        printf("  Test allocation 3: 0x%X (4KB)\n", (uint32_t)test_ptr3);
         
         // Calculate approximate space between blocks
         uint32_t block_overhead = 0;
@@ -683,20 +684,6 @@ int cmd_cpuid(int argc, char* argv[]) {
     return 0;
 }
 
-int cmd_lsmod(int argc, char* argv[]) {
-    printf("Loaded kernel modules:\n");
-    printf("  %-15s %-10s %s\n", "Module", "Size", "Description");
-    printf("  %-15s %-10s %s\n", "------", "----", "-----------");
-    printf("  %-15s %-10s %s\n", "core", "32KB", "Core kernel functionality");
-    printf("  %-15s %-10s %s\n", "hal", "8KB", "Hardware Abstraction Layer");
-    printf("  %-15s %-10s %s\n", "vga_text", "4KB", "VGA text mode driver");
-    printf("  %-15s %-10s %s\n", "keyboard", "6KB", "PS/2 keyboard driver");
-    printf("  %-15s %-10s %s\n", "i8259", "2KB", "PIC interrupt controller");
-    printf("  %-15s %-10s %s\n", "syscall", "12KB", "System call interface");
-    printf("  %-15s %-10s %s\n", "shell", "16KB", "Command shell");
-    return 0;
-}
-
 int cmd_dmesg(int argc, char* argv[]) {
     if (argc == 1) {
         // Show messages
@@ -744,29 +731,25 @@ int cmd_ls(int argc, char* argv[]) {
     
     char current_path[64];
     ramfs_get_current_path(current_path, sizeof(current_path));
-    
+
     printf("Directory listing for %s:\n", current_path);
-    printf("%-20s %-8s %-10s %-12s\n", "Name", "Type", "Size", "Created");
-    printf("------------------------------------------------------\n");
-    
+    printf("%s %s\n", "Type      ", "Name      ");
+    printf("------------------------------------------------------------\n");
+
     int count = 0;
     for (int i = 0; i < MAX_FILES; i++) {
         if (g_ramfs.files[i].in_use && g_ramfs.files[i].parent_index == g_ramfs.current_dir) {
             ram_file_t* file = &g_ramfs.files[i];
             
-            printf("%-20s %-8s %-10u %-12u\n",
-                   file->name,
-                   file->is_directory ? "[DIR]" : "[FILE]",
-                   file->is_directory ? 0U : file->size,
-                   file->created_time);
+            printf("%s %s\n",
+                   file->is_directory ? "DIR       " : "FILE      ",
+                   file->name);
             count++;
         }
     }
     
     if (count == 0) {
         printf("Directory is empty\n");
-    } else {
-        printf("\nTotal: %d items\n", count);
     }
     
     return 0;
@@ -1022,7 +1005,7 @@ int cmd_wc(int argc, char* argv[]) {
         words++;
     }
     
-    printf("  %d  %d  %d  %s\n", lines, words, chars, argv[1]);
+    printf("  %d lines, %d words, %d characters, Filename: %s\n", lines, words, chars, argv[1]);
     
     return 0;
 }
@@ -1089,16 +1072,45 @@ int cmd_edit(int argc, char* argv[]) {
     }
     
     while (1) {
-        printf("> ");
+    // Print prompt using regular output
+    printf("> ");
+
         shell_memset(line_buffer, 0, sizeof(line_buffer));
-        
-        // Read input line
+
+        // Read input line with echo and backspace handling using local cursor
         int i = 0;
         char c;
         while (i < 255) {
             c = shell_getc();
-            if (c == '\n') break;
+            if (c == '\n') {
+                // Move to next line visually
+                putc('\n');
+                break;
+            }
+
+            if (c == '\b') {
+                // Backspace: remove last character if any and update display
+                if (i > 0) {
+                    i--;
+                    // Move cursor one position left and overwrite with space
+                    int cur_x = VGA_get_cursor_x();
+                    int cur_y = VGA_get_cursor_y();
+                    if (cur_x > 0) {
+                        // Write space directly to VGA buffer at the target position
+                        VGA_putchr(cur_x - 1, cur_y, ' ');
+                        // Update software cursor position and hardware cursor
+                        extern int g_ScreenX, g_ScreenY;
+                        g_ScreenX = cur_x - 1;
+                        g_ScreenY = cur_y;
+                        VGA_setcursor(g_ScreenX, g_ScreenY);
+                    }
+                }
+                continue;
+            }
+
+            // Printable characters: store and echo using putc
             line_buffer[i++] = c;
+            if (c >= 32 && c <= 126) putc(c);
         }
         line_buffer[i] = '\0';
         
@@ -1145,7 +1157,7 @@ int cmd_memtest(int argc, char* argv[]) {
     bool all_passed = true;
     
     for (int p = 0; p < pattern_count; p++) {
-        printf("  Testing pattern 0x%02X... ", patterns[p]);
+        printf("  Testing pattern 0x%X... ", patterns[p]);
         
         // Write pattern
         for (int i = 0; i < test_size; i++) {
@@ -1167,95 +1179,6 @@ int cmd_memtest(int argc, char* argv[]) {
     
     printf("Memory test %s\n", all_passed ? "PASSED" : "FAILED");
     return all_passed ? 0 : 1;
-}
-
-int cmd_ports(int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("ports: Hardware port access utility\n");
-        printf("Usage:\n");
-        printf("  ports list               - List common I/O ports\n"); 
-        printf("  ports read <port>        - Read byte from port (hex)\n");
-        printf("  ports write <port> <val> - Write byte to port\n");
-        printf("  ports info <port>        - Get information about port\n");
-        return 1;
-    }
-    
-    if (shell_strcmp(argv[1], "list") == 0) {
-        printf("Common I/O Ports:\n");
-        printf("  Port    Device/Function\n");
-        printf("  ----    ---------------\n");
-        printf("  0x20    PIC 1 Command\n");
-        printf("  0x21    PIC 1 Data\n");
-        printf("  0x40    PIT Channel 0 (Timer)\n");
-        printf("  0x43    PIT Command\n");
-        printf("  0x60    PS/2 Keyboard Data\n");
-        printf("  0x64    PS/2 Keyboard Status/Command\n");
-        printf("  0x70    CMOS/RTC Address\n");
-        printf("  0x71    CMOS/RTC Data\n");
-        printf("  0x3F8   Serial Port 1 (COM1)\n");
-        printf("  0x3FC   Serial Port 1 Control\n");
-        
-    } else if (shell_strcmp(argv[1], "read") == 0) {
-        if (argc < 3) {
-            printf("Usage: ports read <port>\n");
-            return 1;
-        }
-        
-        uint16_t port = hex_str_to_int(argv[2]);
-        uint8_t value = i686_inb(port);
-        printf("Read from port 0x%04X: 0x%02X (%d)\n", port, value, value);
-        
-    } else if (shell_strcmp(argv[1], "write") == 0) {
-        if (argc < 4) {
-            printf("Usage: ports write <port> <value>\n");
-            return 1;
-        }
-        
-        uint16_t port = hex_str_to_int(argv[2]);
-        uint8_t value = (uint8_t)dec_str_to_int(argv[3]);
-        
-        i686_outb(port, value);
-        printf("Wrote 0x%02X (%d) to port 0x%04X\n", value, value, port);
-        
-    } else if (shell_strcmp(argv[1], "info") == 0) {
-        if (argc < 3) {
-            printf("Usage: ports info <port>\n");
-            return 1;
-        }
-        
-        uint16_t port = hex_str_to_int(argv[2]);
-        printf("Port 0x%04X information:\n", port);
-        
-        switch (port) {
-            case 0x20:
-                printf("  PIC 1 Command Port\n");
-                printf("  Used for interrupt controller configuration\n");
-                break;
-            case 0x21:
-                printf("  PIC 1 Data Port\n");
-                printf("  Used for interrupt mask configuration\n");
-                break;
-            case 0x60:
-                printf("  PS/2 Keyboard Data Port\n");
-                printf("  Receives scan codes from keyboard\n");
-                break;
-            case 0x64:
-                printf("  PS/2 Keyboard Status/Command Port\n");
-                printf("  Used for keyboard controller communication\n");
-                break;
-            default:
-                printf("  Unknown or undocumented port\n");
-                printf("  Current value: 0x%02X\n", i686_inb(port));
-                break;
-        }
-        
-    } else {
-        printf("ports: Unknown command '%s'\n", argv[1]);
-        printf("Use 'ports' without arguments for help.\n");
-        return 1;
-    }
-    
-    return 0;
 }
 
 int cmd_interrupt(int argc, char* argv[]) {
@@ -1309,16 +1232,16 @@ int cmd_hexdump(int argc, char* argv[]) {
             length = 4096;
         }
         
-        printf("Hexdump of memory at 0x%08X (%d bytes):\n\n", address, length);
+        printf("Hexdump of memory at 0x%X (%d bytes):\n\n", address, length);
         
         uint8_t* memory = (uint8_t*)address;
         uint32_t offset = 0;
         
         while (offset < length) {
-            printf("%08x  ", address + offset);
+            printf("%x  ", address + offset);
             
             for (int i = 0; i < 16 && offset + i < length; i++) {
-                printf("%02x ", memory[offset + i]);
+                printf("%x ", memory[offset + i]);
                 if (i == 7) printf(" ");
             }
             
@@ -1351,10 +1274,10 @@ int cmd_hexdump(int argc, char* argv[]) {
         
         uint32_t offset = 0;
         while (offset < bytes_read) {
-            printf("%08x  ", offset);
+            printf("%x  ", offset);
             
             for (int i = 0; i < 16 && offset + i < bytes_read; i++) {
-                printf("%02x ", (uint8_t)buffer[offset + i]);
+                printf("%x ", (uint8_t)buffer[offset + i]);
                 if (i == 7) printf(" ");
             }
             
@@ -1389,11 +1312,14 @@ int cmd_keytest(int argc, char* argv[]) {
             uint8_t scancode = i686_inb(0x60);
             
             if (scancode == 0x01) { // ESC
+                // Clear any pending characters so they don't appear in the shell
+                keyboard_clear_buffer();
+                keyboard_reset_dead_state();
                 printf("\nExiting keyboard test\n");
                 break;
             }
             
-            printf("Scancode: 0x%02X", scancode);
+            printf("Scancode: 0x%X", scancode);
             if (scancode & 0x80) {
                 printf(" (key released)");
             } else {
@@ -1476,14 +1402,14 @@ int cmd_registers(int argc, char* argv[]) {
     
     printf("CPU Registers:\n");
     printf("  General Purpose:\n");
-    printf("    EAX: 0x%08X    EBX: 0x%08X\n", eax, ebx);
-    printf("    ECX: 0x%08X    EDX: 0x%08X\n", ecx, edx);
+    printf("    EAX: 0x%X    EBX: 0x%X\n", eax, ebx);
+    printf("    ECX: 0x%X    EDX: 0x%X\n", ecx, edx);
     printf("  Index Registers:\n");
-    printf("    ESI: 0x%08X    EDI: 0x%08X\n", esi, edi);
+    printf("    ESI: 0x%X    EDI: 0x%X\n", esi, edi);
     printf("  Stack Pointers:\n");
-    printf("    ESP: 0x%08X    EBP: 0x%08X\n", esp, ebp);
+    printf("    ESP: 0x%X    EBP: 0x%X\n", esp, ebp);
     printf("  Flags:\n");
-    printf("    EFLAGS: 0x%08X\n", eflags);
+    printf("    EFLAGS: 0x%X\n", eflags);
     
     printf("  Flag Bits: ");
     if (eflags & 0x001) printf("CF ");
@@ -1536,8 +1462,8 @@ int cmd_syscall_test(int argc, char* argv[]) {
         printf("Testing malloc:\n");
         void* ptr1 = sys_malloc(256);
         void* ptr2 = sys_malloc(512);
-        printf("  Allocated 256 bytes at: 0x%08X\n", (uint32_t)ptr1);
-        printf("  Allocated 512 bytes at: 0x%08X\n", (uint32_t)ptr2);
+        printf("  Allocated 256 bytes at: 0x%X\n", (uint32_t)ptr1);
+        printf("  Allocated 512 bytes at: 0x%X\n", (uint32_t)ptr2);
         
         if (ptr1 && ptr2) {
             strcpy((char*)ptr1, "Test data 1");
@@ -1598,7 +1524,7 @@ int cmd_malloc_test(int argc, char* argv[]) {
     void* ptr = sys_malloc(size);
     
     if (ptr) {
-        printf("Success! Allocated at address: 0x%08X\n", (uint32_t)ptr);
+        printf("Success! Allocated at address: 0x%X\n", (uint32_t)ptr);
         
         // Write test data
         char* data = (char*)ptr;
@@ -1624,7 +1550,7 @@ int cmd_heap_info(int argc, char* argv[]) {
     printf("=== Heap Information ===\n\n");
     
     printf("Heap configuration:\n");
-    printf("  Start address: 0x%08X\n", 0x400000);
+    printf("  Start address: 0x%X\n", 0x400000);
     printf("  Size: %d KB (%d bytes)\n", 0x100000 / 1024, 0x100000);
     printf("  Block size: %d bytes\n", 32);
     printf("  Management: Simple block allocator\n");
@@ -1637,7 +1563,7 @@ int cmd_heap_info(int argc, char* argv[]) {
     for (int i = 0; i < 5; i++) {
         test_ptrs[i] = sys_malloc(sizes[i]);
         if (test_ptrs[i]) {
-            printf("  Allocated %d bytes at 0x%08X\n", sizes[i], (uint32_t)test_ptrs[i]);
+            printf("  Allocated %d bytes at 0x%X\n", sizes[i], (uint32_t)test_ptrs[i]);
         } else {
             printf("  Failed to allocate %d bytes\n", sizes[i]);
         }
@@ -1647,60 +1573,9 @@ int cmd_heap_info(int argc, char* argv[]) {
     for (int i = 0; i < 5; i++) {
         if (test_ptrs[i]) {
             sys_free(test_ptrs[i]);
-            printf("  Freed block at 0x%08X\n", (uint32_t)test_ptrs[i]);
+            printf("  Freed block at 0x%X\n", (uint32_t)test_ptrs[i]);
         }
     }
-    
-    return 0;
-}
-
-int cmd_syscall_info(int argc, char* argv[]) {
-    printf("=== System Call Information ===\n\n");
-    
-    printf("Syscall Interface:\n");
-    printf("  Interrupt Vector: 0x80 (128)\n");
-    printf("  Total Available: %d system calls\n", SYSCALL_COUNT);
-    printf("  Calling Convention: Software interrupt\n");
-    printf("  Parameters: EAX=number, EBX=arg1, ECX=arg2, EDX=arg3, ESI=arg4\n");
-    printf("  Return Value: EAX register\n\n");
-    
-    printf("Implemented System Calls:\n");
-    printf("  %-3s %-15s %s\n", "ID", "Name", "Description");
-    printf("  %-3s %-15s %s\n", "---", "----", "-----------");
-    printf("  %-3d %-15s %s\n", 0, "exit", "Exit process with status code");
-    printf("  %-3d %-15s %s\n", 1, "print", "Print string to console");
-    printf("  %-3d %-15s %s\n", 2, "read", "Read data from descriptor");
-    printf("  %-3d %-15s %s\n", 3, "malloc", "Allocate memory block");
-    printf("  %-3d %-15s %s\n", 4, "free", "Release memory block");
-    printf("  %-3d %-15s %s\n", 5, "open", "Open file descriptor");
-    printf("  %-3d %-15s %s\n", 6, "close", "Close file descriptor");
-    printf("  %-3d %-15s %s\n", 7, "write", "Write data to descriptor");
-    printf("  %-3d %-15s %s\n", 8, "seek", "Set file position (stub)");
-    printf("  %-3d %-15s %s\n", 9, "getpid", "Get process identifier");
-    printf("  %-3d %-15s %s\n", 10, "time", "Get system time in ticks");
-    printf("  %-3d %-15s %s\n", 11, "sleep", "Sleep for milliseconds");
-    printf("  %-3d %-15s %s\n", 12, "yield", "Yield CPU time slice");
-    
-    printf("\nReturn Codes:\n");
-    printf("  %-3d - SYSCALL_OK (Success)\n", 0);
-    printf("  %-3d - SYSCALL_ERROR (General error)\n", -1);
-    printf("  %-3d - SYSCALL_INVALID_SYSCALL (Unknown call)\n", -2);
-    printf("  %-3d - SYSCALL_INVALID_PARAMS (Bad parameters)\n", -3);
-    printf("  %-3d - SYSCALL_PERMISSION_DENIED (Access denied)\n", -4);
-    printf("  %-3d - SYSCALL_NOT_FOUND (Resource not found)\n", -5);
-    printf("  %-3d - SYSCALL_OUT_OF_MEMORY (Memory exhausted)\n", -6);
-    
-    printf("\nMemory Management:\n");
-    printf("  Heap Start: 0x400000 (4MB)\n");
-    printf("  Heap Size: 1048576 bytes (1MB)\n");
-    printf("  Block Size: 32 bytes minimum\n");
-    printf("  Algorithm: Simple linked list allocator\n");
-    
-    printf("\nUsage Examples:\n");
-    printf("  syscall_test basic     - Test basic functionality\n");
-    printf("  syscall_test memory    - Test malloc/free operations\n");
-    printf("  malloc_test 1024       - Allocate 1KB test block\n");
-    printf("  sleep 1000             - Sleep for 1 second\n");
     
     return 0;
 }
@@ -1789,17 +1664,16 @@ const ShellCommandEntry shell_commands[] = {
     {"uptime",          "Show system uptime",                               cmd_uptime},
     {"cpuinfo",         "Show CPU information",                             cmd_cpuinfo},
     {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
-    {"lsmod",           "List loaded kernel modules",                       cmd_lsmod}, // DELETE
     {"dmesg",           "Show kernel messages",                             cmd_dmesg},
     
     // File System (RAM-based - SEMIFUNCTIONAL)
-    {"ls",              "List directory contents",                          cmd_ls}, //FIXME:
+    {"ls",              "List directory contents",                          cmd_ls},
     {"cd",              "Change directory",                                 cmd_cd},
     {"pwd",             "Print working directory",                          cmd_pwd},
     {"mkdir",           "Create directory",                                 cmd_mkdir},
     {"rm",              "Remove file or directory",                         cmd_rm},
     {"cat",             "Display file contents",                            cmd_cat},
-    {"edit",            "Edit text file",                                   cmd_edit}, //FIXME:
+    {"edit",            "Edit text file",                                   cmd_edit},
     {"touch",           "Create empty file",                                cmd_touch},
     {"find",            "Find files by name pattern",                       cmd_find},
     {"grep",            "Search text in files",                             cmd_grep},
@@ -1807,10 +1681,9 @@ const ShellCommandEntry shell_commands[] = {
     
     // Hardware & Debug
     {"memtest",         "Run basic memory test",                            cmd_memtest},
-    {"ports",           "Hardware port access utility",                     cmd_ports}, // DELETE
     {"interrupt",       "Control interrupt state",                          cmd_interrupt},
     {"hexdump",         "Display file/memory in hexadecimal",               cmd_hexdump},
-    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest}, // FIXME:
+    {"keytest",         "Test keyboard input (shows scancodes)",            cmd_keytest},
     {"benchmark",       "Run CPU benchmark",                                cmd_benchmark},
     {"registers",       "Show CPU register values",                         cmd_registers},
     
@@ -1818,12 +1691,12 @@ const ShellCommandEntry shell_commands[] = {
     {"syscall_test",    "Test system call functionality",                   cmd_syscall_test},
     {"malloc_test",     "Test memory allocation via syscall",               cmd_malloc_test},
     {"heap_info",       "Show heap information and test",                   cmd_heap_info},
-    {"syscall_info",    "Show syscall information and usage",               cmd_syscall_info}, //FIXME:
     {"sleep",           "Test sleep syscall",                               cmd_sleep_test},
     
     // System Control
     {"reboot",          "Restart the system",                               cmd_reboot},
-    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic}, // TODO: ADD EXIT COMMAND
+    {"panic",           "Trigger a kernel panic (for testing)",             cmd_panic},
+    {"exit",            "Power off / halt the system",                     cmd_exit},
     
     // Terminator
     {NULL, NULL, NULL}
@@ -1846,4 +1719,18 @@ const ShellCommandEntry* find_shell_command(const char* name) {
         }
     }
     return NULL;
+}
+
+int cmd_exit(int argc, char* argv[]) {
+    printf("Shutting down...\n");
+
+    i686_outb(0x604, 0x00);
+    i686_outb(0x605, 0x20);
+
+    i686_DisableInterrupts();
+    while (1) {
+        i686_hlt();
+    }
+
+    return 0;
 }

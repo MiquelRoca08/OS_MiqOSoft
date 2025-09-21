@@ -154,7 +154,6 @@ void shell_init(void) {
     
     keyboard_set_shell_mode(true);
     
-    printf("MiqOSoft Shell v1.0\n");
     printf("Type 'help' for a list of available commands.\n");
     printf("Total commands available: %d\n", get_shell_command_count());
     
