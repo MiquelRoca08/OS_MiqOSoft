@@ -1666,7 +1666,7 @@ const ShellCommandEntry shell_commands[] = {
     {"cpuid",           "Show detailed CPU information via CPUID",          cmd_cpuid},
     {"dmesg",           "Show kernel messages",                             cmd_dmesg},
     
-    // File System (RAM-based - SEMIFUNCTIONAL)
+    // File System (RAM-based)
     {"ls",              "List directory contents",                          cmd_ls},
     {"cd",              "Change directory",                                 cmd_cd},
     {"pwd",             "Print working directory",                          cmd_pwd},
