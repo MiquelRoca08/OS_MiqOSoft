@@ -9,7 +9,7 @@ VARS = Variables('build_scripts/config.py', ARGUMENTS)
 VARS.AddVariables(
     EnumVariable("config",
                  help="Build configuration",
-                 default="debug",
+                 default="release",
                  allowed_values=("debug", "release")),
 
     EnumVariable("arch", 
