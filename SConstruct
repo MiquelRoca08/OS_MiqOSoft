@@ -63,7 +63,7 @@ HOST_ENVIRONMENT.Append(
 if HOST_ENVIRONMENT['config'] == 'debug':
     HOST_ENVIRONMENT.Append(CCFLAGS = ['-O0'])
 else:
-    HOST_ENVIRONMENT.Append(CCFLAGS = ['-O3'])
+    HOST_ENVIRONMENT.Append(CCFLAGS = ['-O2', '-fno-strict-aliasing', '-fno-builtin', '-fno-omit-frame-pointer'])
 
 if HOST_ENVIRONMENT['imageType'] == 'floppy':
     HOST_ENVIRONMENT['imageFS'] = 'fat12'
