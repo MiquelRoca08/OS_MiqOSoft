@@ -413,7 +413,7 @@ const char* get_command_category(const char* name) {
     // System Information
     else if (shell_strcmp(name, "memory") == 0 || shell_strcmp(name, "uptime") == 0 ||
              shell_strcmp(name, "cpuinfo") == 0 || shell_strcmp(name, "cpuid") == 0 ||
-             shell_strcmp(name, "lsmod") == 0 || shell_strcmp(name, "dmesg") == 0) {
+             shell_strcmp(name, "dmesg") == 0) {
         return "System Information";
     }
     // File System
@@ -439,7 +439,8 @@ const char* get_command_category(const char* name) {
         return "System Calls";
     }
     // System Control
-    else if (shell_strcmp(name, "reboot") == 0 || shell_strcmp(name, "panic") == 0) {
+    else if (shell_strcmp(name, "reboot") == 0 || shell_strcmp(name, "panic") == 0 ||
+             shell_strcmp(name, "exit") == 0) {
         return "System Control";
     }
     
@@ -534,18 +535,6 @@ int cmd_version(int argc, char* argv[]) {
     printf("Built with: GCC cross-compiler\n");
     printf("Shell: MiqOSoft Shell v1.0\n");
     printf("Features: RAM File System, System calls, Memory management\n");
-    return 0;
-}
-
-int cmd_test_all(int argc, char* argv[]) {
-    printf("Running all system call tests...\n");
-    syscall_run_all_tests();
-    return 0;
-}
-
-int cmd_test_heap_integrity(int argc, char* argv[]) {
-    printf("Testing heap integrity...\n");
-    syscall_test_heap_integrity();
     return 0;
 }
 
@@ -1656,8 +1645,6 @@ const ShellCommandEntry shell_commands[] = {
     {"clear",           "Clear the screen",                                 cmd_clear},
     {"echo",            "Display a line of text",                           cmd_echo},
     {"version",         "Show OS version information",                      cmd_version},
-    {"test",            "Run all syscall tests",                            cmd_test_all},
-    {"heap_test",       "Run heap integrity test",                          cmd_test_heap_integrity},
     
     // System Information
     {"memory",          "Show memory information",                          cmd_memory},
